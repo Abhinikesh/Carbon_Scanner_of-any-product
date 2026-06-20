@@ -1,14 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Leaf, Search, Bell, BarChart2, CloudUpload, LayoutGrid, GraduationCap,
+  Leaf, Search, Bell, BarChart2, CloudUpload, LayoutGrid,
   Settings, QrCode, X, ChevronDown, User, LogOut
 } from 'lucide-react';
 
 import Home         from './pages/Home.jsx';
 import UploadCenter from './pages/UploadCenter.jsx';
 import Dashboard    from './pages/Dashboard.jsx';
-import EducationHub from './pages/EducationHub.jsx';
 import SettingsPage from './pages/Settings.jsx';
 import Login        from './pages/Login.jsx';
 
@@ -148,7 +147,6 @@ function Sidebar() {
     { to: '/',          label: 'Home',         Icon: BarChart2      },
     { to: '/upload',    label: 'Upload Center', Icon: CloudUpload   },
     { to: '/dashboard', label: 'Dashboard',    Icon: LayoutGrid     },
-    { to: '/education', label: 'Education Hub', Icon: GraduationCap },
     { to: '/settings',  label: 'Settings',     Icon: Settings       },
   ];
 
@@ -236,7 +234,6 @@ function Layout({ children }) {
           { to: '/',          Icon: BarChart2,      label: 'Home'     },
           { to: '/upload',    Icon: CloudUpload,    label: 'Upload'   },
           { to: '/dashboard', Icon: LayoutGrid,     label: 'Dashboard'},
-          { to: '/education', Icon: GraduationCap,  label: 'Education'},
           { to: '/settings',  Icon: Settings,       label: 'Settings' },
         ].map(({ to, Icon, label }) => (
           <Link key={to} to={to} className="flex flex-col items-center gap-1 text-[10px] text-gray-400">
@@ -256,7 +253,6 @@ export default function App() {
       <Route path="/" element={<Layout><Home /></Layout>} />
       <Route path="/upload" element={<Layout><UploadCenter /></Layout>} />
       <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
-      <Route path="/education" element={<Layout><EducationHub /></Layout>} />
       <Route path="/settings" element={<Layout><SettingsPage /></Layout>} />
       <Route path="*" element={<Layout><Home /></Layout>} />
     </Routes>
