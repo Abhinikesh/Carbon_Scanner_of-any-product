@@ -1,16 +1,31 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 @theme {
-  --font-inter: 'Inter', sans-serif;
-  --color-mint: #f0f5f2;
-  --color-green-dark: #1a3d2b;
-  --color-green-accent: #00c896;
+  /* Colors */
+  --color-paper: #f0f5f2;
+  --color-ink: #14231B;
+  --color-forest: #1a3d2b;
+  --color-forest-dark: #14301f;
+  --color-mist: #E8EDE6;
+
+  /* Fonts */
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
 }
 
 body {
-  font-family: var(--font-inter);
-  background-color: var(--color-mint);
+  font-family: var(--font-body);
+  background-color: var(--color-paper);
+  color: var(--color-ink);
   margin: 0;
   padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Precise numerical style */
+.stat-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }

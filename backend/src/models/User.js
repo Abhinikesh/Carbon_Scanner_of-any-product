@@ -10,17 +10,36 @@ const carbonHistorySchema = new mongoose.Schema({
 
 const userSchema = new mongoose.Schema(
   {
-    name: { type: String, required: [true, 'Name is required'], trim: true },
+    name: {
+      type: String,
+      required: [true, 'Name is required'],
+      trim: true,
+    },
     email: {
       type: String,
       required: [true, 'Email is required'],
       unique: true,
       lowercase: true,
       trim: true,
-      match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email'],
     },
-    password: { type: String, minlength: 6, select: false },
-    avatar: { type: String, default: '' },
+    password: {
+      type: String,
+      required: [true, 'Password is required'],
+      select: false,
+    },
+    avatar: {
+      type: String,
+      default: '',
+    },
+    refreshTokenHash: {
+      type: String,
+      default: null,
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+    // Preserved fields for application statistics and dashboards
     googleId: { type: String },
     totalScans: { type: Number, default: 0 },
     totalCO2: { type: Number, default: 0 },
@@ -28,15 +47,14 @@ const userSchema = new mongoose.Schema(
     badges: { type: [String], default: [] },
     streak: { type: Number, default: 0 },
     lastScanDate: { type: Date },
-    refreshToken: { type: String, select: false },
   },
   { timestamps: true }
 );
 
-// Hash password before saving
+// Hash password before saving with 10 salt rounds
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
-  const salt = await bcrypt.genSalt(12);
+  const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
   next();
 });
