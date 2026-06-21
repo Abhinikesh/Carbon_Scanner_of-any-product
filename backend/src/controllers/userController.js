@@ -66,7 +66,7 @@ const updateProfile = async (req, res, next) => {
       req.user._id,
       { name, avatar },
       { new: true, runValidators: true }
-    );
+    ).select('-password -refreshTokenHash');
     return sendSuccess(res, 200, 'Profile updated', { user });
   } catch (error) {
     next(error);
@@ -85,9 +85,53 @@ const getLeaderboard = async (req, res, next) => {
       .limit(10)
       .select('name avatar totalScans totalCO2 badges');
     return sendSuccess(res, 200, 'Leaderboard fetched', { leaders });
+};
+
+/**
+ * @desc   Update user preferences (name, pushNotifications)
+ * @route  PUT /api/users/me
+ * @access Private
+ */
+const updateMe = async (req, res, next) => {
+  try {
+    const { name, preferences } = req.body;
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (name !== undefined) {
+      if (typeof name !== 'string' || name.trim() === '') {
+        return res.status(400).json({ success: false, message: 'Name must be a valid non-empty string' });
+      }
+      user.name = name.trim();
+    }
+
+    if (preferences !== undefined) {
+      if (preferences.pushNotifications !== undefined) {
+        if (typeof preferences.pushNotifications !== 'boolean') {
+          return res.status(400).json({ success: false, message: 'pushNotifications must be a boolean' });
+        }
+        user.preferences = {
+          ...user.preferences,
+          pushNotifications: preferences.pushNotifications
+        };
+      }
+    }
+
+    await user.save();
+
+    const userObj = user.toObject();
+    delete userObj.password;
+    delete userObj.refreshTokenHash;
+
+    return res.status(200).json({
+      success: true,
+      user: userObj
+    });
   } catch (error) {
     next(error);
   }
 };
 
-module.exports = { getDashboard, updateProfile, getLeaderboard };
+module.exports = { getDashboard, updateProfile, getLeaderboard, updateMe };

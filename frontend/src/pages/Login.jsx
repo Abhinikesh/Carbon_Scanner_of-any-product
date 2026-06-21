@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Leaf, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import ErrorBanner from '../components/common/ErrorBanner.jsx';
 
 export default function Login() {
   const { login } = useAuth();
@@ -66,11 +67,7 @@ export default function Login() {
         <p className="font-body text-sm text-gray-500 mb-6">Log in to see your real footprint.</p>
 
         {/* Backend Error alert */}
-        {errorMsg && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-xl leading-relaxed">
-            {errorMsg}
-          </div>
-        )}
+        {errorMsg && <ErrorBanner message={errorMsg} />}
 
         <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           {/* Email field */}

@@ -1,0 +1,50 @@
+{
+  "_source_note": "Approximated from publicly known DEFRA/UK Government GHG Conversion Factors, US EPA emission factor methodology, and Poore & Nemecek (2018, Science) food lifecycle data. Verify exact current-year figures at gov.uk/government/publications/greenhouse-gas-reporting-conversion-factors and epa.gov/climateleadership/ghg-emission-factors-hub before any commercial or compliance use.",
+  "_disclaimer": "Directional estimates for personal footprint awareness only.",
+
+  "spendCategories": {
+    "groceries":     { "factorPerDollar": 0.30, "label": "Groceries" },
+    "restaurant":     { "factorPerDollar": 0.40, "label": "Restaurant & Dining" },
+    "clothing":       { "factorPerDollar": 0.25, "label": "Clothing & Fashion" },
+    "electronics":    { "factorPerDollar": 0.35, "label": "Electronics Retail" },
+    "fuel":           { "factorPerDollar": 2.30, "label": "Fuel & Gas" },
+    "pharmacy":       { "factorPerDollar": 0.20, "label": "Pharmacy & Health" },
+    "homeGoods":      { "factorPerDollar": 0.30, "label": "Home Goods & Furniture" },
+    "general":        { "factorPerDollar": 0.25, "label": "General Retail" }
+  },
+
+  "materialCategories": {
+    "leather":            { "co2PerItem": 15,  "label": "Leather Goods" },
+    "cotton":             { "co2PerItem": 7,   "label": "Cotton Textile" },
+    "syntheticTextile":   { "co2PerItem": 5.5, "label": "Synthetic Textile" },
+    "plastic":            { "co2PerItem": 3,   "label": "Plastic Item" },
+    "bambooWood":         { "co2PerItem": 1.5, "label": "Bamboo / Wood" },
+    "glass":              { "co2PerItem": 2,   "label": "Glass Item" },
+    "metal":              { "co2PerItem": 6,   "label": "Metal Item" },
+    "paper":              { "co2PerItem": 1,   "label": "Paper / Cardboard" },
+    "electronicsSmall":   { "co2PerItem": 8,   "label": "Small Electronics (cable, charger)" },
+    "electronicsPhone":   { "co2PerItem": 70,  "label": "Smartphone" },
+    "electronicsLaptop":  { "co2PerItem": 300, "label": "Laptop / Computer" },
+    "general":            { "co2PerItem": 5,   "label": "General / Unidentified" }
+  },
+
+  "foodPerKg": {
+    "beef": 60, "lamb": 24, "pork": 7, "poultry": 6, "fish": 5,
+    "eggs": 4.5, "cheese": 21, "milk": 3, "rice": 4, "tofu": 3,
+    "vegetables": 0.4, "fruit": 0.5, "legumes": 1, "grains": 1.1
+  },
+
+  "flightFactors": {
+    "domesticPerKm": 0.246,
+    "shortHaulPerKm": 0.151,
+    "longHaulPerKm": 0.148,
+    "shortHaulThresholdKm": 1500
+  },
+
+  "scoreNormalization": {
+    "spendCategoryMin": 0.20,
+    "spendCategoryMax": 2.30,
+    "materialMin": 1,
+    "materialMax": 300
+  }
+}

@@ -92,6 +92,18 @@ export function AuthProvider({ children }) {
     }
   };
 
+  /**
+   * Refresh current user data from the database
+   */
+  const refreshUser = async () => {
+    try {
+      const res = await api.get('/auth/me');
+      setUser(res.data.user);
+    } catch (err) {
+      console.error('[AuthContext] Failed to refresh user data:', err);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -102,6 +114,7 @@ export function AuthProvider({ children }) {
         login,
         register,
         logout,
+        refreshUser,
       }}
     >
       {children}

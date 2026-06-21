@@ -1,12 +1,16 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   ShoppingCart, Receipt, Plane, Barcode, FileUp, Plus,
   Brain, FileText, CheckCircle2, ShieldCheck, CheckCheck,
-  FileSearch, ScanLine, X, Loader2
+  FileSearch, ScanLine, X, Loader2, AlertCircle, ChevronDown, ChevronUp, Recycle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Toast } from '../App.jsx';
-import api from '../api.js';
+import api from '../lib/api.js'; // Use the authenticated Axios client from Part 5
+import { useScanStats } from '../context/ScanStatsContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
+import { convertPdfFirstPageToFile } from '../lib/pdfToImage';
+import { decodeBarcodeFromFile } from '../lib/barcodeScanner';
 
 const TABS = [
   { id: 'product', label: 'Product', Icon: ShoppingCart },
@@ -16,21 +20,111 @@ const TABS = [
 ];
 
 const ACCEPT = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'];
-const MAX_MB = 25;
+const MAX_MB = 10; // Backend limits fileSize to max 10MB
+
+// Curated Category Lists for Manual Correction (matching backend emissionFactors.json keys/labels)
+const SPEND_CATEGORIES = [
+  'Groceries',
+  'Restaurant & Dining',
+  'Clothing & Fashion',
+  'Electronics Retail',
+  'Fuel & Gas',
+  'Pharmacy & Health',
+  'Home Goods & Furniture',
+  'General Retail'
+];
+
+const MATERIAL_AND_FOOD_CATEGORIES = [
+  'Leather Goods',
+  'Cotton Textile',
+  'Synthetic Textile',
+  'Plastic Item',
+  'Bamboo / Wood',
+  'Glass Item',
+  'Metal Item',
+  'Paper / Cardboard',
+  'Small Electronics (cable, charger)',
+  'Smartphone',
+  'Laptop / Computer',
+  'Beef',
+  'Lamb',
+  'Pork',
+  'Poultry',
+  'Fish',
+  'Eggs',
+  'Cheese',
+  'Milk',
+  'Rice',
+  'Tofu',
+  'Vegetables',
+  'Fruit',
+  'Legumes',
+  'Grains',
+  'General / Unidentified'
+];
 
 export default function UploadCenter() {
-  const navigate    = useNavigate();
+  const navigate = useNavigate();
+  const { refreshStats } = useScanStats();
   const [activeTab, setActiveTab] = useState('product');
-  const [files,     setFiles]     = useState([]);
-  const [toast,     setToast]     = useState(null);
-  const [loading,   setLoading]   = useState(false);
-  const [success,   setSuccess]   = useState(false);
-  const [dragging,  setDragging]  = useState(false);
-  const fileInputRef    = useRef(null);
+  
+  // Track selected/staged files in component state, keyed to the currently active tab
+  const [tabFiles, setTabFiles] = useState({
+    product: [],
+    receipt: [],
+    flight: [],
+    barcode: []
+  });
+
+  const [toast, setToast] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  
+  // Barcode decoding states
+  const [barcodeResult, setBarcodeResult] = useState({ value: '', error: null, decoding: false });
+  
+  // Live Activity states
+  const [liveActivity, setLiveActivity] = useState([]);
+  const [expandedScanId, setExpandedScanId] = useState(null);
+  const [correctingScanId, setCorrectingScanId] = useState(null);
+  const { refreshUser } = useAuth();
+  const [unlockedBadges, setUnlockedBadges] = useState([]);
+  const [updatingCategory, setUpdatingCategory] = useState(false);
+
+  const fileInputRef = useRef(null);
   const addMoreInputRef = useRef(null);
+
+  const files = tabFiles[activeTab] || [];
 
   function showToast(msg, type = 'error') {
     setToast({ msg, type });
+  }
+
+  // Fetch recent scans from the database
+  const fetchRecentScans = useCallback(async () => {
+    try {
+      const res = await api.get('/scans?limit=5');
+      setLiveActivity(res.data || []);
+    } catch (err) {
+      console.error('Error fetching scans:', err);
+    }
+  }, []);
+
+  // Fetch scans on load
+  useEffect(() => {
+    fetchRecentScans();
+  }, [fetchRecentScans]);
+
+  // Handle barcode decoding for barcode uploads
+  async function handleBarcodeDecode(file) {
+    setBarcodeResult({ value: '', error: null, decoding: true });
+    try {
+      const decodedValue = await decodeBarcodeFromFile(file);
+      setBarcodeResult({ value: decodedValue, error: null, decoding: false });
+    } catch (err) {
+      setBarcodeResult({ value: '', error: err.message, decoding: false });
+    }
   }
 
   function validateAndAdd(newFiles) {
@@ -46,7 +140,20 @@ export default function UploadCenter() {
       }
       valid.push({ file: f, preview: f.type.startsWith('image/') ? URL.createObjectURL(f) : null });
     }
-    setFiles(prev => [...prev, ...valid]);
+
+    setTabFiles(prev => {
+      const updated = [...prev[activeTab], ...valid];
+      
+      // For barcode scans specifically, attempt client-side decoding immediately
+      if (activeTab === 'barcode' && updated.length > 0) {
+        handleBarcodeDecode(updated[0].file);
+      }
+      
+      return {
+        ...prev,
+        [activeTab]: updated
+      };
+    });
   }
 
   function onFileInput(e) {
@@ -55,11 +162,19 @@ export default function UploadCenter() {
   }
 
   function removeFile(idx) {
-    setFiles(prev => {
-      const copy = [...prev];
+    setTabFiles(prev => {
+      const copy = [...prev[activeTab]];
       if (copy[idx].preview) URL.revokeObjectURL(copy[idx].preview);
       copy.splice(idx, 1);
-      return copy;
+      
+      if (activeTab === 'barcode' && copy.length === 0) {
+        setBarcodeResult({ value: '', error: null, decoding: false });
+      }
+
+      return {
+        ...prev,
+        [activeTab]: copy
+      };
     });
   }
 
@@ -70,7 +185,7 @@ export default function UploadCenter() {
     e.preventDefault();
     setDragging(false);
     validateAndAdd(Array.from(e.dataTransfer.files));
-  }, []);
+  }, [activeTab]);
 
   async function handleProcess() {
     if (files.length === 0) {
@@ -78,30 +193,126 @@ export default function UploadCenter() {
       return;
     }
     setLoading(true);
+    setSuccess(false);
+
+    // Create a local placeholder for the processing item in Live Activity
+    const tempScanId = 'temp-' + Date.now();
+    const tempScan = {
+      _id: tempScanId,
+      type: activeTab,
+      originalFilename: activeTab === 'barcode' 
+        ? `Barcode: ${barcodeResult.value || 'Manual Entry'}` 
+        : files[0].file.name,
+      status: 'processing',
+      createdAt: new Date().toISOString()
+    };
+    setLiveActivity(prev => [tempScan, ...prev.slice(0, 4)]);
+
     try {
-      // Build multipart payload – backend expects field name "image"
-      const formData = new FormData();
-      // Use the first file for standard single uploads
-      formData.append('image', files[0].file);
-      formData.append('type', activeTab); // product | receipt | flight | barcode
+      let response;
+      if (activeTab === 'barcode') {
+        const barcodeVal = barcodeResult.value ? barcodeResult.value.trim() : '';
+        if (!barcodeVal) {
+          throw new Error("Couldn't read the barcode — enter it manually");
+        }
 
-      await api.post('/api/scan/upload', formData);
+        response = await api.post('/scans', {
+          type: 'barcode',
+          barcodeValue: barcodeVal
+        });
+      } else {
+        let fileToUpload = files[0].file;
+        
+        // Convert PDF to image client-side if needed
+        if (fileToUpload.type === 'application/pdf') {
+          fileToUpload = await convertPdfFirstPageToFile(fileToUpload);
+        }
 
-      setLoading(false);
+        const formData = new FormData();
+        formData.append('file', fileToUpload);
+        formData.append('type', activeTab);
+
+        response = await api.post('/scans', formData);
+      }
+
       setSuccess(true);
-      showToast('Files processed successfully!', 'success');
-      setTimeout(() => navigate('/app/dashboard'), 1500);
+      showToast('File processed successfully!', 'success');
+
+      // Check for newly earned badges in the response
+      const resData = response?.data;
+      if (resData && resData.newBadges && resData.newBadges.length > 0) {
+        const newBadgesList = resData.newBadges;
+        setUnlockedBadges(prev => [...prev, ...newBadgesList]);
+        setTimeout(() => {
+          setUnlockedBadges(prev => prev.filter(b => !newBadgesList.some(nb => nb.key === b.key)));
+        }, 5000);
+      }
+      
+      // Clear state for the current active tab
+      setTabFiles(prev => ({
+        ...prev,
+        [activeTab]: []
+      }));
+      setBarcodeResult({ value: '', error: null, decoding: false });
+      
+      // Refresh database records
+      await fetchRecentScans();
+      refreshStats();
+      await refreshUser();
+      
+      setTimeout(() => {
+        setSuccess(false);
+      }, 2000);
     } catch (err) {
-      setLoading(false);
-      const isOffline =
-        err.message === 'Failed to fetch' || err.status === undefined;
+      console.error('[UploadCenter] Processing error:', err);
+      
+      const errorMsg = err.response?.data?.message || err.message || 'Processing failed';
+
+      // Mark the placeholder item as failed and attach error description
+      setLiveActivity(prev =>
+        prev.map(s =>
+          s._id === tempScanId
+            ? { ...s, status: 'failed', errorMessage: errorMsg }
+            : s
+        )
+      );
+      refreshStats();
+
+      const isOffline = err.message === 'Failed to fetch' || err.status === undefined;
       showToast(
         isOffline
           ? 'Cannot reach the server. Is the backend running on port 5000?'
-          : err.message || 'Processing failed. Please try again.'
+          : errorMsg
       );
+    } finally {
+      setLoading(false);
     }
   }
+
+  // Handle manual category correction override request
+  async function handleCategoryCorrection(scanId, newCategory) {
+    setUpdatingCategory(true);
+    try {
+      const res = await api.patch(`/scans/${scanId}/category`, { newCategory });
+      showToast('Category updated successfully!', 'success');
+      
+      // Update item in local state list live with the corrected response values
+      setLiveActivity(prev =>
+        prev.map(s => (s._id === scanId ? res.data : s))
+      );
+      refreshStats();
+      setCorrectingScanId(null);
+    } catch (err) {
+      console.error('[UploadCenter] Manual category correction failed:', err);
+      const errorMsg = err.response?.data?.message || err.message || 'Failed to update category';
+      showToast(errorMsg);
+    } finally {
+      setUpdatingCategory(false);
+    }
+  }
+
+  // Type helper for labels
+  const getTabLabel = (id) => TABS.find(t => t.id === id)?.label || id;
 
   return (
     <div className="px-10 pt-8 pb-10 bg-paper">
@@ -121,7 +332,11 @@ export default function UploadCenter() {
           {TABS.map(({ id, label, Icon }) => (
             <button
               key={id}
-              onClick={() => setActiveTab(id)}
+              onClick={() => {
+                setActiveTab(id);
+                // Clear success indicator on tab switch
+                setSuccess(false);
+              }}
               className={`flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg transition-all font-body ${
                 activeTab === id
                   ? 'bg-white text-gray-900 shadow-sm'
@@ -160,11 +375,45 @@ export default function UploadCenter() {
               </div>
               <p className="font-display font-bold text-ink text-[15px] mb-1">Drop files here or browse</p>
               <p className="text-xs text-gray-400 font-body">
-                Upload multiple PDF, PNG, or JPG (Max <span className="font-mono tabular-nums">{MAX_MB}</span>MB each)
+                Upload PDF, PNG, JPG, or WEBP (Max <span className="font-mono tabular-nums">{MAX_MB}</span>MB)
               </p>
             </div>
-            <input ref={fileInputRef} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp" className="hidden" onChange={onFileInput} />
-            <input ref={addMoreInputRef} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp" className="hidden" onChange={onFileInput} />
+            <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" className="hidden" onChange={onFileInput} />
+            <input ref={addMoreInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" className="hidden" onChange={onFileInput} />
+
+            {/* Staged Barcode Manual Input */}
+            {activeTab === 'barcode' && (barcodeResult.error || barcodeResult.value) && (
+              <div className="mb-6 p-4 rounded-xl border font-body">
+                {barcodeResult.error && (
+                  <div className="bg-red-50 border border-red-200 p-3 rounded-lg text-red-600 text-sm">
+                    <p className="font-bold flex items-center gap-1.5 mb-2">
+                      <AlertCircle className="w-4 h-4" /> Couldn't auto-detect barcode.
+                    </p>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Enter Barcode Manually</label>
+                    <input
+                      type="text"
+                      value={barcodeResult.value}
+                      onChange={(e) => setBarcodeResult(prev => ({ ...prev, value: e.target.value }))}
+                      placeholder="e.g. 012345678905"
+                      className="w-full h-10 px-3 border border-mist rounded-lg focus:outline-none focus:ring-2 focus:ring-forest/20 text-sm font-mono"
+                    />
+                  </div>
+                )}
+                {barcodeResult.value && !barcodeResult.error && (
+                  <div className="bg-green-50 border border-green-200 p-3 rounded-lg text-forest text-sm font-bold flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-forest" />
+                    <span>Detected barcode value: <span className="font-mono text-gray-900">{barcodeResult.value}</span></span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'barcode' && barcodeResult.decoding && (
+              <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-600 flex items-center gap-2 font-body">
+                <Loader2 className="w-4 h-4 animate-spin text-forest" />
+                <span className="text-sm">Decoding barcode image client-side...</span>
+              </div>
+            )}
 
             {/* Thumbnails */}
             <div className="flex flex-wrap gap-4 mb-7">
@@ -183,14 +432,14 @@ export default function UploadCenter() {
                   {/* Remove button */}
                   <button
                     onClick={(e) => { e.stopPropagation(); removeFile(i); }}
-                    className="absolute top-1.5 right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-1.5 right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                   >
                     <X className="w-3 h-3 text-white" />
                   </button>
                 </div>
               ))}
 
-              {/* Static receipt thumb (always shown) */}
+              {/* Static placeholders (only shown if tab is empty) */}
               {files.length === 0 && (
                 <>
                   <div className="w-[110px] h-[110px] bg-[#353d38] rounded-xl overflow-hidden flex items-center justify-center p-2 flex-shrink-0">
@@ -228,10 +477,10 @@ export default function UploadCenter() {
                 </>
               )}
 
-              {/* Add more */}
+              {/* Add more button */}
               <button
                 onClick={() => addMoreInputRef.current?.click()}
-                className="w-[110px] h-[110px] border-2 border-dashed border-mist rounded-xl flex flex-col items-center justify-center gap-2 text-gray-400 hover:border-forest hover:text-forest transition-colors flex-shrink-0"
+                className="w-[110px] h-[110px] border-2 border-dashed border-mist rounded-xl flex flex-col items-center justify-center gap-2 text-gray-400 hover:border-forest hover:text-forest transition-colors flex-shrink-0 cursor-pointer"
               >
                 <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center"><Plus className="w-4 h-4" /></div>
                 <span className="text-xs font-semibold font-body">Add more</span>
@@ -241,17 +490,17 @@ export default function UploadCenter() {
             {/* Process button */}
             <button
               onClick={handleProcess}
-              disabled={loading || success}
-              className={`w-full h-[52px] rounded-xl flex items-center justify-center gap-3 font-bold text-sm transition-all font-body focus:outline-none focus:ring-2 focus:ring-forest/20 ${
+              disabled={loading || success || (activeTab === 'barcode' && !barcodeResult.value && !barcodeResult.decoding)}
+              className={`w-full h-[52px] rounded-xl flex items-center justify-center gap-3 font-bold text-sm transition-all font-body focus:outline-none focus:ring-2 focus:ring-forest/20 cursor-pointer ${
                 success
                   ? 'bg-[#00c896] text-white'
-                  : 'bg-forest hover:bg-forest-dark text-white disabled:opacity-70'
+                  : 'bg-forest hover:bg-forest-dark text-white disabled:opacity-50 disabled:cursor-not-allowed'
               }`}
             >
               {loading
                 ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</>
                 : success
-                  ? <><CheckCircle2 className="w-5 h-5" /> Done! Redirecting...</>
+                  ? <><CheckCircle2 className="w-5 h-5" /> Success!</>
                   : <><ScanLine className="w-5 h-5" /> Process with AI Lens</>
               }
             </button>
@@ -260,58 +509,347 @@ export default function UploadCenter() {
 
         {/* ── RIGHT ── */}
         <div className="w-full lg:w-[38%] flex flex-col gap-5">
-          {/* AI Processing card */}
+          {/* AI Processing Layer card */}
           <div className="bg-forest rounded-xl p-6 text-white shadow-sm">
-            <div className="flex items-center gap-2.5 mb-5">
+            <div className="flex items-center gap-2.5 mb-4">
               <Brain className="w-5 h-5 text-white" />
               <h3 className="font-display font-bold text-[15px]">AI Processing Layer</h3>
             </div>
-            <div className="flex justify-between items-center mb-2 font-body">
-              <span className="text-gray-300 text-sm">Engine Status</span>
-              <span className="font-bold text-xs bg-forest-dark border border-mist/35 text-white px-2.5 py-0.5 rounded-full font-mono">ACTIVE</span>
-            </div>
-            <div className="h-1.5 bg-[#2d5940] rounded-full mb-5 overflow-hidden">
-              <div className="h-full bg-[#00c896] w-full rounded-full" />
-            </div>
-            <p className="text-xs text-gray-300 leading-relaxed font-body">
-              Our neural engine is currently decoding OCR data and classifying carbon footprints using international GHG protocols.
+            <p className="text-xs text-gray-200 leading-relaxed font-body">
+              Tesseract.js reads your upload directly on the server — no third-party AI service, no data leaves this app.
             </p>
           </div>
+
+          {/* Celebratory badge unlock banner */}
+          {unlockedBadges.length > 0 && (
+            <div className="flex flex-col gap-2">
+              {unlockedBadges.map((badge) => (
+                <div
+                  key={badge.key}
+                  className="bg-forest border border-emerald-500 rounded-xl p-4 text-white shadow-lg animate-bounce flex items-center gap-3 animate-pulse"
+                >
+                  <span className="text-3xl">{badge.emoji}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-xs uppercase tracking-wider text-green-400 font-display">🏆 Badge Unlocked!</p>
+                    <p className="font-bold text-sm font-display">{badge.label}</p>
+                    <p className="text-[10px] text-gray-200 font-body">{badge.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Live Activity card */}
           <div className="bg-white border border-mist rounded-xl p-5 flex flex-col shadow-sm">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-display font-bold text-ink text-[15px]">Live Activity</h3>
-              <span className="text-[9px] font-mono font-bold text-forest bg-green-50 px-2.5 py-1 rounded uppercase tracking-widest">Processing</span>
+              <span className="text-[9px] font-mono font-bold text-forest bg-green-50 px-2.5 py-1 rounded uppercase tracking-widest">Active DB</span>
             </div>
             <div className="flex flex-col gap-4">
-              {[
-                { Icon: FileText,    name: 'WholeFoods_09_22...', subText: 'Groceries • ', subSize: '1.2', subUnit: 'MB', status: <><span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /><span className="text-xs font-semibold text-green-600 font-body">Extracting OCR</span></> },
-                { Icon: Barcode,     name: 'UPC_8849201.jpg',     subText: 'Electronics • ', subSize: '840', subUnit: 'KB', status: <><span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" /><span className="text-xs font-semibold text-blue-600 font-body">Classifying</span></> },
-                { Icon: CheckCircle2,name: 'LHR_NYC_Flight.pdf',  subText: 'Travel • ', subSize: '2.1', subUnit: 'MB', status: <span className="text-xs text-gray-400 font-semibold font-body">Done</span> },
-              ].map(({ Icon, name, subText, subSize, subUnit, status }, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-forest rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Icon className="w-4 h-4 text-white" />
+              {liveActivity.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-4 font-body">No recent activities found.</p>
+              ) : (
+                liveActivity.map((scan) => {
+                  const isTemp = scan._id.toString().startsWith('temp-');
+                  const isExpanded = expandedScanId === scan._id;
+
+                  // Render status badge configuration
+                  let statusBadge = null;
+                  if (scan.status === 'processing') {
+                    statusBadge = (
+                      <div className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                        <span className="text-xs font-semibold text-amber-600 font-body">Processing</span>
+                      </div>
+                    );
+                  } else if (scan.status === 'ocr_done') {
+                    statusBadge = (
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs font-semibold text-green-600 font-body">Done</span>
+                      </div>
+                    );
+                  } else if (scan.status === 'failed') {
+                    statusBadge = (
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs font-semibold text-red-600 font-body">Failed</span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div 
+                      key={scan._id} 
+                      className={`border-b border-gray-50 last:border-b-0 pb-3 last:pb-0 ${
+                        !isTemp && scan.status !== 'processing' ? 'cursor-pointer hover:bg-gray-50/50 rounded-lg p-1.5 transition-colors' : 'p-1.5'
+                      }`}
+                      onClick={() => {
+                        if (!isTemp && scan.status !== 'processing') {
+                          setExpandedScanId(isExpanded ? null : scan._id);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="w-8 h-8 bg-forest/10 text-forest rounded-lg flex items-center justify-center flex-shrink-0">
+                            {scan.type === 'barcode' ? <Barcode className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-xs text-ink leading-tight font-display truncate">
+                              {scan.type === 'barcode' ? `Barcode: ${scan.barcodeValue || 'N/A'}` : scan.originalFilename}
+                            </p>
+
+                            {/* Category & CO2 emissions live tracking details */}
+                            {scan.status === 'ocr_done' && (
+                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                {/* Score dot indicator matching dashboard score ranges */}
+                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                                  scan.score == null 
+                                    ? 'bg-gray-400' 
+                                    : scan.score >= 70 
+                                      ? 'bg-green-500' 
+                                      : scan.score >= 40 
+                                        ? 'bg-yellow-500' 
+                                        : 'bg-red-500'
+                                }`} />
+                                
+                                <span className="text-[11px] font-semibold text-gray-700 truncate max-w-[120px]">
+                                  {scan.category || 'Unidentified'}
+                                </span>
+                                
+                                <span className="text-[11px] text-gray-400">•</span>
+                                
+                                <span className="text-[11px] font-mono font-bold text-forest tabular-nums">
+                                  {scan.co2Kg != null ? `${scan.co2Kg} kg CO2e` : 'No CO2'}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Optional Estimated Label for Spend Amount estimation */}
+                            {scan.status === 'ocr_done' && scan.parsedFields?.estimatedAmount && (
+                              <span className="text-[9px] text-yellow-600 bg-yellow-50 px-1 py-0.5 rounded font-body inline-block mt-0.5">
+                                (amount estimated)
+                              </span>
+                            )}
+
+                            {/* If CO2 calculation failed or route unverified, show the note message with grey dot */}
+                            {scan.status === 'ocr_done' && scan.co2Kg == null && scan.parsedFields?.note && (
+                              <p className="text-[10px] text-gray-500 mt-1 leading-normal italic font-body max-w-full truncate">
+                                Note: {scan.parsedFields.note}
+                              </p>
+                            )}
+
+                            <p className="text-[9px] text-gray-400 mt-1 font-body uppercase tracking-wider">
+                              {getTabLabel(scan.type)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                          {statusBadge}
+                          {!isTemp && scan.status === 'ocr_done' && (
+                            isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-gray-400" /> : <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Display failure message if scan failed */}
+                      {scan.status === 'failed' && scan.errorMessage && (
+                        <p className="text-[10px] text-red-500 mt-1 pl-11 font-body">
+                          Error: {scan.errorMessage}
+                        </p>
+                      )}
+
+                      {/* Expandable Selector for Manual Category Correction Override */}
+                      {!isTemp && scan.status === 'ocr_done' && scan.type !== 'flight' && (
+                        <div className="mt-2 pl-11">
+                          {correctingScanId === scan._id ? (
+                            <div className="flex items-center gap-2 w-full" onClick={(e) => e.stopPropagation()}>
+                              <select
+                                defaultValue={scan.category || ''}
+                                disabled={updatingCategory}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  handleCategoryCorrection(scan._id, e.target.value);
+                                }}
+                                className="text-xs border border-mist rounded px-1.5 py-1 bg-white text-gray-700 max-w-full font-body focus:outline-none focus:ring-1 focus:ring-forest cursor-pointer"
+                              >
+                                <option value="" disabled>Select category...</option>
+                                {(scan.type === 'receipt' ? SPEND_CATEGORIES : MATERIAL_AND_FOOD_CATEGORIES).map((cat) => (
+                                  <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                              </select>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCorrectingScanId(null);
+                                }}
+                                disabled={updatingCategory}
+                                className="text-[10px] text-gray-400 hover:text-gray-600 font-bold cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCorrectingScanId(scan._id);
+                              }}
+                              className="text-[10px] font-bold text-forest hover:text-forest-dark hover:underline cursor-pointer"
+                            >
+                              Wrong category? Fix it
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Expanded scan fields / text details */}
+                      {isExpanded && scan.status === 'ocr_done' && (
+                        <div className="mt-3 pl-11 text-xs font-body text-gray-700" onClick={(e) => e.stopPropagation()}>
+                          {scan.type === 'barcode' ? (
+                            <div className="bg-gray-50 border border-mist p-2.5 rounded-lg">
+                              <div className="font-mono text-[10px] flex flex-col gap-1.5">
+                                <div className="flex justify-between">
+                                  <span className="text-gray-400 uppercase font-bold">Barcode Value:</span>
+                                  <span className="text-gray-900 font-bold select-text tabular-nums">{scan.barcodeValue}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-400 uppercase font-bold">Category Match:</span>
+                                  <span className="text-gray-900 font-bold">{scan.category || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-400 uppercase font-bold">Carbon Score:</span>
+                                  <span className="text-gray-900 font-bold tabular-nums">{scan.score != null ? `${scan.score}/100` : 'N/A'}</span>
+                                </div>
+                                {scan.manuallyCorrected && (
+                                  <div className="text-[9px] text-forest font-bold bg-green-50 px-1.5 py-0.5 rounded text-center mt-1 uppercase">
+                                    Manually Corrected
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col gap-2.5">
+                              {/* Display parsed fields values */}
+                              <div className="bg-gray-50 border border-mist p-2.5 rounded-lg">
+                                <p className="font-bold text-gray-800 mb-1 border-b border-gray-200 pb-1">Extracted Metadata</p>
+                                <div className="font-mono text-[10px] mt-1.5 flex flex-col gap-1.5">
+                                  {scan.type === 'receipt' && (
+                                    <>
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-400 uppercase font-bold">Store:</span>
+                                        <span className="text-gray-900 font-bold select-text">{scan.parsedFields?.storeName || 'N/A'}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-400 uppercase font-bold">Total Amount:</span>
+                                        <span className="text-gray-900 font-bold select-text tabular-nums">
+                                          {scan.parsedFields?.totalAmount != null ? `$${scan.parsedFields.totalAmount.toFixed(2)}` : 'N/A'}
+                                        </span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-400 uppercase font-bold">Calculated Score:</span>
+                                        <span className="text-gray-900 font-bold select-text tabular-nums">
+                                          {scan.score != null ? `${scan.score}/100` : 'N/A'}
+                                        </span>
+                                      </div>
+                                      {scan.manuallyCorrected && (
+                                        <div className="text-[9px] text-forest font-bold bg-green-50 px-1.5 py-0.5 rounded text-center uppercase">
+                                          Manually Corrected
+                                        </div>
+                                      )}
+                                      {scan.parsedFields?.itemLines && scan.parsedFields.itemLines.length > 0 && (
+                                        <div className="mt-1">
+                                          <span className="text-gray-400 uppercase font-bold block mb-1">Items Lines:</span>
+                                          <div className="bg-white border border-gray-100 p-1.5 rounded max-h-24 overflow-y-auto leading-normal text-gray-600 flex flex-col gap-0.5 font-sans">
+                                            {scan.parsedFields.itemLines.map((line, idx) => (
+                                              <div key={idx} className="truncate select-text">{line}</div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                  {scan.type === 'flight' && (
+                                    <>
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-400 uppercase font-bold">Flight Number:</span>
+                                        <span className="text-gray-900 font-bold select-text">{scan.parsedFields?.flightNumber || 'N/A'}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-400 uppercase font-bold">Airport Codes:</span>
+                                        <span className="text-gray-900 font-bold select-text">
+                                          {scan.parsedFields?.airportCodes?.length > 0 ? scan.parsedFields.airportCodes.join(' → ') : 'N/A'}
+                                        </span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-400 uppercase font-bold">Flight Distance:</span>
+                                        <span className="text-gray-900 font-bold select-text tabular-nums">
+                                          {scan.parsedFields?.distanceKm != null ? `${scan.parsedFields.distanceKm} km` : 'N/A'}
+                                        </span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-400 uppercase font-bold">Date Guess:</span>
+                                        <span className="text-gray-900 font-bold select-text tabular-nums">{scan.parsedFields?.dateGuess || 'N/A'}</span>
+                                      </div>
+                                    </>
+                                  )}
+                                  {scan.type === 'product' && (
+                                    <>
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-400 uppercase font-bold">Name Guess:</span>
+                                        <span className="text-gray-900 font-bold select-text">{scan.parsedFields?.productNameGuess || 'N/A'}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-400 uppercase font-bold">Calculated Score:</span>
+                                        <span className="text-gray-900 font-bold select-text tabular-nums">{scan.score != null ? `${scan.score}/100` : 'N/A'}</span>
+                                      </div>
+                                      {scan.manuallyCorrected && (
+                                        <div className="text-[9px] text-forest font-bold bg-green-50 px-1.5 py-0.5 rounded text-center uppercase">
+                                          Manually Corrected
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Display OCR Raw text */}
+                              <div className="bg-gray-50 border border-mist p-2.5 rounded-lg">
+                                <p className="font-bold text-gray-800 mb-1">Raw Extracted Text</p>
+                                <pre className="bg-white border border-gray-100 p-2 rounded text-[10px] font-mono leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto select-text">
+                                  {scan.rawText || '(No readable text extracted)'}
+                                </pre>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Disposal Guide Quick Link */}
+                          {scan.category && scan.type !== 'flight' && (
+                            <div className="mt-3 pt-3 border-t border-dashed border-mist flex justify-between items-center">
+                              <div className="flex flex-col">
+                                <span className="text-[10px] uppercase font-bold text-gray-400">Waste Classification</span>
+                                <span className="text-gray-900 font-bold capitalize">{scan.category.replace(/_/g, ' ')}</span>
+                              </div>
+                              <button
+                                onClick={() => navigate(`/app/recycle?query=${encodeURIComponent(scan.category)}&scanId=${scan._id}`)}
+                                className="bg-forest/10 hover:bg-forest/20 text-forest font-bold text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                              >
+                                <Recycle className="w-3.5 h-3.5" />
+                                Disposal Guide
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <p className="font-bold text-sm text-ink leading-tight font-display">{name}</p>
-                      <p className="text-xs text-gray-400 mt-0.5 font-body">
-                        {subText}
-                        <span className="font-mono tabular-nums">{subSize}</span>
-                        {subUnit}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5">{status}</div>
-                </div>
-              ))}
+                  );
+                })
+              )}
             </div>
             <div className="mt-6 pt-4 border-t border-mist text-center">
               <button
                 onClick={() => navigate('/app/dashboard')}
-                className="text-[10px] font-mono font-bold text-forest hover:text-forest-dark uppercase tracking-widest transition-colors focus:outline-none focus:ring-2 focus:ring-forest/20 rounded px-1"
+                className="text-[10px] font-mono font-bold text-forest hover:text-forest-dark uppercase tracking-widest transition-colors focus:outline-none focus:ring-2 focus:ring-forest/20 rounded px-1 cursor-pointer"
               >
                 View History
               </button>
@@ -323,13 +861,13 @@ export default function UploadCenter() {
       {/* Bottom 3 feature cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-5">
         {[
-          { Icon: ShieldCheck, title: 'Secure Transmission', text: 'All uploads are encrypted with AES-256 and processed in isolated sandbox environments.' },
-          { Icon: CheckCheck,  title: 'Auto-Classification', text: 'Our AI automatically maps your data to the correct footprint category based on metadata.' },
-          { Icon: FileSearch,  title: 'Archive Standards',   text: 'Compliant with GHG Protocol Corporate Standard for verifiable carbon reporting.' },
+          { Icon: ShieldCheck, title: 'Secure Transmission', text: 'All uploads are processed directly in your server. Files reside only in memory storage and never hit local disk.' },
+          { Icon: CheckCheck,  title: 'Local Processing', text: 'No third-party paid APIs. Barcode and text recognition are executed locally using free libraries.' },
+          { Icon: FileSearch,  title: 'Structure Parsing',   text: 'Extracted raw OCR string gets mapped to structured receipts, flight ticket information, or product names.' },
         ].map(({ Icon, title, text }) => (
           <div key={title} className="bg-white border border-mist rounded-xl p-6 shadow-sm">
             <Icon className="w-5 h-5 text-gray-500 mb-4" />
-            <h4 className="font-display font-bold text-ink text-sm mb-2">{title}</h4>
+            <span className="font-display font-bold text-ink text-sm mb-2 block">{title}</span>
             <p className="font-body text-xs text-gray-500 leading-relaxed">{text}</p>
           </div>
         ))}

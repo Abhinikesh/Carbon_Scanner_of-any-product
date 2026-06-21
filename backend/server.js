@@ -34,7 +34,9 @@ app.use(generalLimiter);
 app.use('/api/auth', require('./src/routes/authRoutes'));
 app.use('/api/scans', require('./src/routes/scanRoutes'));
 app.use('/api/user', require('./src/routes/userRoutes'));
+app.use('/api/users', require('./src/routes/userRoutes'));
 app.use('/api/carbon', require('./src/routes/carbonRoutes'));
+app.use('/api/recycle', require('./src/routes/recycleRoutes'));
 
 // Health check route
 app.get('/api/health', (req, res) => {

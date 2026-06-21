@@ -1,0 +1,145 @@
+{
+  "plastic": {
+    "label": "Plastic",
+    "recyclable": true,
+    "hazardous": false,
+    "instructions": [
+      "Empty all liquid or food residue and rinse the item thoroughly.",
+      "Locate the recycling triangle number on the bottom or side of the package.",
+      "Most municipal collection programs accept resin codes #1 (PET) and #2 (HDPE) curbside.",
+      "Avoid placing plastic film, grocery bags, or lightweight wrappers into the curbside bin; these require a dedicated store drop-off point."
+    ]
+  },
+  "glass": {
+    "label": "Glass",
+    "recyclable": true,
+    "hazardous": false,
+    "instructions": [
+      "Wash the container completely with water to remove food particles.",
+      "Detach metal lids or plastic caps, as they should be sorted separately.",
+      "Place clean bottles and jars in the recycling bin.",
+      "Note that broken glass, windows, mirrors, or drinking glasses are not curbside-safe and must be disposed of with general trash wrapped in thick paper."
+    ]
+  },
+  "paper_cardboard": {
+    "label": "Paper & Cardboard",
+    "recyclable": true,
+    "hazardous": false,
+    "instructions": [
+      "Keep all paper products dry, as wet paper cannot be recycled.",
+      "Flatten cardboard boxes to save space in the bin.",
+      "Peel off excess adhesive packaging tape and remove large staples.",
+      "Dispose of heavily soiled items, like greasy pizza boxes or wax-coated cartons, in the general landfill container."
+    ]
+  },
+  "metal_cans": {
+    "label": "Metal Cans & Scrap",
+    "recyclable": true,
+    "hazardous": false,
+    "instructions": [
+      "Empty food contents and rinse tin, steel, or aluminum cans.",
+      "If the metal lid is detached, push it inside the can or drop it in the bin separately.",
+      "Clean aluminum foil is recyclable if crumpled into a tight ball.",
+      "Take large scrap metal pieces to a local scrap yard or designated transfer facility rather than putting them curbside."
+    ]
+  },
+  "electronics_small": {
+    "label": "Small Electronics",
+    "recyclable": true,
+    "hazardous": true,
+    "instructions": [
+      "Never throw electronic parts, cords, or chargers in the regular trash.",
+      "Gather any small cables, adapters, remote controls, or old headphones.",
+      "Locate a certified electronics retailer or supermarket that runs a free take-back program.",
+      "Alternatively, drop them off at your city's municipal e-waste recycling collection bin."
+    ]
+  },
+  "electronics_large": {
+    "label": "Large Electronics (laptop, TV, monitor)",
+    "recyclable": true,
+    "hazardous": true,
+    "instructions": [
+      "Backup all personal records and wipe clean the storage drives on laptops or computers.",
+      "Contact the hardware manufacturer to see if they offer a free mail-back or recycling initiative.",
+      "Take bulky screens, monitors, printers, and televisions to a certified e-waste recycler.",
+      "Do not leave screens curbside without booking a specialty waste pickup."
+    ]
+  },
+  "batteries": {
+    "label": "Batteries",
+    "recyclable": true,
+    "hazardous": true,
+    "instructions": [
+      "Put clear tape over the terminals of lithium or button-cell batteries to prevent electrical short-circuits.",
+      "Store spent batteries in a non-conductive plastic bucket until disposal.",
+      "Never toss batteries in curbside recycling or trash bins due to fire hazards.",
+      "Bring them to a battery collection tube found in hardware stores, grocery stores, or hazardous waste centers."
+    ]
+  },
+  "textile_clothing": {
+    "label": "Clothing & Textiles",
+    "recyclable": true,
+    "hazardous": false,
+    "instructions": [
+      "Separate garments that are still in wearable condition from those that are torn or stained.",
+      "Launder the clothes to ensure they are clean and dry before disposal.",
+      "Donate wearable apparel to local charities or secondhand retail shops.",
+      "Drop heavily worn or shredded materials at a dedicated textile collection bin for industrial repurposing."
+    ]
+  },
+  "organic_food_waste": {
+    "label": "Food & Organic Waste",
+    "recyclable": true,
+    "hazardous": false,
+    "instructions": [
+      "Collect fruit peels, vegetable scraps, coffee grounds, and eggshells.",
+      "Place organic waste in a backyard compost heap or a green curbside collection bin.",
+      "Avoid putting animal bones, meat leftovers, dairy products, or cooking oil into backyard composters to keep pests away.",
+      "Ensure no plastic stickers or bands are attached to produce skins."
+    ]
+  },
+  "hazardous_chemicals": {
+    "label": "Hazardous Chemicals (paint, oil, pesticide)",
+    "recyclable": false,
+    "hazardous": true,
+    "instructions": [
+      "Keep paints, household chemicals, motor oil, and pesticides in their original packaging with legible labels.",
+      "Seal the lids tightly to prevent chemical spills or toxic vapor leaks.",
+      "Under no circumstances should you pour chemicals down a sink drain, storm drain, or onto the ground.",
+      "Search for your municipality's household hazardous waste (HHW) drop-off facility or special collection events."
+    ]
+  },
+  "light_bulbs_cfl": {
+    "label": "CFL / Fluorescent Bulbs",
+    "recyclable": true,
+    "hazardous": true,
+    "instructions": [
+      "Handle CFL and fluorescent tubes carefully to avoid breaking them, as they contain trace amounts of mercury.",
+      "Pack the bulbs in a cardboard box or paper sleeve to cushion them.",
+      "Do not throw fluorescent bulbs into the general household trash.",
+      "Deliver them to participating home improvement stores or municipal hazardous waste collections."
+    ]
+  },
+  "furniture_large_items": {
+    "label": "Furniture & Bulky Items",
+    "recyclable": false,
+    "hazardous": false,
+    "instructions": [
+      "Assess if the furniture can be repaired, repurposed, or donated to charity.",
+      "Check if your city's waste department offers bulk trash collection days.",
+      "Schedule a bulky item pickup service in advance if required.",
+      "Deliver large mattresses, couches, or wooden tables directly to a regional solid waste transfer station."
+    ]
+  },
+  "general_landfill": {
+    "label": "General Waste",
+    "recyclable": false,
+    "hazardous": false,
+    "instructions": [
+      "Review municipal sorting guides to check if the material can be recycled locally.",
+      "If the item is mixed-material (like plastic bonded with metal or foil), it generally belongs in the landfill bin.",
+      "Bag the waste securely before tossing it into the gray/black general trash receptacle.",
+      "When in doubt, search the item name on your local waste management department's online directory."
+    ]
+  }
+}

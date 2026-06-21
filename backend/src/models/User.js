@@ -46,7 +46,13 @@ const userSchema = new mongoose.Schema(
     carbonHistory: [carbonHistorySchema],
     badges: { type: [String], default: [] },
     streak: { type: Number, default: 0 },
-    lastScanDate: { type: Date },
+    lastScanDate: { type: Date, default: null },
+    preferences: {
+      pushNotifications: { type: Boolean, default: true }
+    },
+    currentStreakDays: { type: Number, default: 0 },
+    longestStreakDays: { type: Number, default: 0 },
+    recycleLookupsCount: { type: Number, default: 0 }
   },
   { timestamps: true }
 );

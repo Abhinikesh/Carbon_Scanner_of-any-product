@@ -48,6 +48,10 @@ const scanSchema = new mongoose.Schema({
     type: Number,
     default: null
   },
+  manuallyCorrected: {
+    type: Boolean,
+    default: false
+  },
   createdAt: {
     type: Date,
     default: Date.now

@@ -2,11 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
   Leaf, Search, Bell, BarChart2, CloudUpload, LayoutGrid,
-  Settings, QrCode, X, ChevronDown, User, LogOut
+  Settings, QrCode, X, ChevronDown, User, LogOut, Recycle
 } from 'lucide-react';
 
 import Home         from './pages/Home.jsx';
 import UploadCenter from './pages/UploadCenter.jsx';
+import RecycleFinder from './pages/RecycleFinder.jsx';
 import Dashboard    from './pages/Dashboard.jsx';
 import SettingsPage from './pages/Settings.jsx';
 import Login        from './pages/Login.jsx';
@@ -16,6 +17,7 @@ import LandingPage  from './pages/LandingPage.jsx';
 import ProtectedRoute  from './components/ProtectedRoute.jsx';
 import PublicOnlyRoute from './components/PublicOnlyRoute.jsx';
 import { useAuth }     from './context/AuthContext.jsx';
+import { ScanStatsProvider, useScanStats } from './context/ScanStatsContext.jsx';
 
 /* ─── NAVBAR ───────────────────────────────────────────────────────────── */
 function Navbar() {
@@ -41,6 +43,7 @@ function Navbar() {
   const navLinks = [
     { to: '/app/home',          label: 'Home'          },
     { to: '/app/upload-center', label: 'Upload Center' },
+    { to: '/app/recycle',       label: 'Recycle Finder' },
     { to: '/app/dashboard',     label: 'Dashboard'     },
   ];
 
@@ -160,10 +163,12 @@ function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { stats, isLoading } = useScanStats();
 
   const navItems = [
     { to: '/app/home',          label: 'Home',         Icon: BarChart2      },
     { to: '/app/upload-center', label: 'Upload Center', Icon: CloudUpload   },
+    { to: '/app/recycle',       label: 'Recycle Finder',Icon: Recycle       },
     { to: '/app/dashboard',     label: 'Dashboard',    Icon: LayoutGrid     },
     { to: '/app/settings',      label: 'Settings',     Icon: Settings       },
   ];
@@ -185,7 +190,9 @@ function Sidebar() {
             Sustainability<br />Level
           </p>
           <p className="text-sm font-bold text-ink mt-1 font-body">
-            Monthly CO2e: <span className="font-mono tabular-nums">42</span>kg
+            Monthly CO2e: <span className="font-mono tabular-nums">
+              {isLoading && stats === null ? '—' : `${stats?.thisMonthCo2Kg ?? 0} kg`}
+            </span>
           </p>
         </div>
       </div>
@@ -254,6 +261,14 @@ export function Toast({ message, type = 'error', onClose }) {
 
 /* ─── LAYOUT WRAPPER ───────────────────────────────────────────────────── */
 function AppLayout({ children }) {
+  return (
+    <ScanStatsProvider>
+      <AppLayoutContent>{children}</AppLayoutContent>
+    </ScanStatsProvider>
+  );
+}
+
+function AppLayoutContent({ children }) {
   const { user } = useAuth();
   return (
     <div className="font-body antialiased text-ink">
@@ -267,6 +282,7 @@ function AppLayout({ children }) {
         {[
           { to: '/app/home',          Icon: BarChart2,      label: 'Home'     },
           { to: '/app/upload-center', Icon: CloudUpload,    label: 'Upload'   },
+          { to: '/app/recycle',       Icon: Recycle,        label: 'Recycle'  },
           { to: '/app/dashboard',     Icon: LayoutGrid,     label: 'Dashboard'},
           { to: '/app/settings',      Icon: Settings,       label: 'Settings' },
         ].map(({ to, Icon, label }) => (
@@ -296,6 +312,7 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route path="/app/home" element={<AppLayout><Home /></AppLayout>} />
         <Route path="/app/upload-center" element={<AppLayout><UploadCenter /></AppLayout>} />
+        <Route path="/app/recycle" element={<AppLayout><RecycleFinder /></AppLayout>} />
         <Route path="/app/dashboard" element={<AppLayout><Dashboard /></AppLayout>} />
         <Route path="/app/settings" element={<AppLayout><SettingsPage /></AppLayout>} />
       </Route>

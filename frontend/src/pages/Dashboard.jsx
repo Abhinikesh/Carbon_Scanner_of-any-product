@@ -1,29 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BarChart2, Leaf, Zap, Award, CloudUpload,
-  CheckCircle2, Clock, TrendingDown
+  CheckCircle2, Clock, TrendingDown, X
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   ResponsiveContainer, Area, AreaChart, XAxis, YAxis,
   CartesianGrid, Tooltip
 } from 'recharts';
-
-const carbonData = [
-  { month: 'Oct', co2: 68 },
-  { month: 'Nov', co2: 55 },
-  { month: 'Dec', co2: 80 },
-  { month: 'Jan', co2: 61 },
-  { month: 'Feb', co2: 49 },
-  { month: 'Mar', co2: 42 },
-];
-
-const recentScans = [
-  { name: 'WholeFoods_09_22.jpg', category: 'Groceries', co2Val: '1.8',  co2Unit: 'kg', score: 72, status: 'Done',       date: '2 Apr 2026' },
-  { name: 'UPC_8849201.jpg',      category: 'Electronics', co2Val: '4.2',  co2Unit: 'kg', score: 38, status: 'Done',       date: '1 Apr 2026' },
-  { name: 'LHR_NYC_Flight.pdf',   category: 'Travel',      co2Val: '28.5', co2Unit: 'kg', score: 15, status: 'Done',       date: '30 Mar 2026' },
-  { name: 'Burger_photo.png',     category: 'Food',        co2Val: '2.1',  co2Unit: 'kg', score: 55, status: 'Processing', date: '29 Mar 2026' },
-];
+import { useScanStats } from '../context/ScanStatsContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
+import api from '../lib/api';
+import Spinner from '../components/common/Spinner.jsx';
+import EmptyState from '../components/common/EmptyState.jsx';
+import { BADGE_CATALOG } from '../data/badgeCatalog.js';
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload?.length) {
@@ -40,7 +30,18 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 function ScoreBadge({ score }) {
-  const color = score >= 70 ? 'text-green-600 bg-green-50' : score >= 50 ? 'text-yellow-600 bg-yellow-50' : 'text-red-500 bg-red-50';
+  if (score === null || score === undefined) {
+    return (
+      <span className="text-xs font-bold px-2 py-0.5 rounded-full text-gray-500 bg-gray-100 font-mono">
+        —
+      </span>
+    );
+  }
+  const color = score >= 70 
+    ? 'text-green-600 bg-green-50' 
+    : score >= 40 
+      ? 'text-yellow-600 bg-yellow-50' 
+      : 'text-red-500 bg-red-50';
   return (
     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${color}`}>
       <span className="font-mono tabular-nums">{score}</span>
@@ -48,16 +49,83 @@ function ScoreBadge({ score }) {
   );
 }
 
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  const date = new Date(dateStr);
+  const day = date.getDate();
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = months[date.getMonth()];
+  const year = date.getFullYear();
+  return `${day} ${month} ${year}`;
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [range, setRange] = useState('6M');
+  const { stats, isLoading, refreshStats } = useScanStats();
+  const { user } = useAuth();
+  
+  const [selectedRange, setSelectedRange] = useState('6m'); // '3m', '6m', '1y'
+  const [chartData, setChartData] = useState([]);
+  const [chartLoading, setChartLoading] = useState(true);
 
-  const stats = [
-    { label: 'Total Scans',         value: '12',     unit: '',       Icon: BarChart2,    color: 'bg-blue-50   text-blue-600'  },
-    { label: 'Total CO₂ Tracked',   value: '127',    unit: ' kg',    Icon: Leaf,         color: 'bg-green-50  text-forest' },
-    { label: 'This Month',          value: '42',     unit: ' kg',    Icon: Zap,          color: 'bg-yellow-50 text-yellow-600'},
-    { label: 'Sustainability Score', value: '64/100',  unit: '',       Icon: Award,        color: 'bg-purple-50 text-purple-600'},
-  ];
+  const [scans, setScans] = useState([]);
+  const [scansLoading, setScansLoading] = useState(true);
+
+  // Manual refresh on mount
+  useEffect(() => {
+    refreshStats();
+  }, []);
+
+  // Fetch chart data on mount and range change
+  useEffect(() => {
+    let active = true;
+    const fetchChart = async () => {
+      setChartLoading(true);
+      try {
+        const res = await api.get(`/scans/chart?range=${selectedRange}`);
+        if (active && res.data && res.data.success) {
+          setChartData(res.data.data);
+        }
+      } catch (err) {
+        console.error('[Dashboard] Failed to fetch chart data:', err);
+      } finally {
+        if (active) setChartLoading(false);
+      }
+    };
+    fetchChart();
+    return () => {
+      active = false;
+    };
+  }, [selectedRange]);
+
+  // Fetch recent scans (limit = 5)
+  useEffect(() => {
+    let active = true;
+    const fetchScans = async () => {
+      setScansLoading(true);
+      try {
+        const res = await api.get('/scans?limit=5');
+        if (active) {
+          setScans(res.data || []);
+        }
+      } catch (err) {
+        console.error('[Dashboard] Failed to fetch recent scans:', err);
+      } finally {
+        if (active) setScansLoading(false);
+      }
+    };
+    fetchScans();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const displayTotalScans = stats?.totalScans ?? 0;
+  const displayTotalCo2 = stats?.totalCo2Kg ?? 0;
+  const displayThisMonth = stats?.thisMonthCo2Kg ?? 0;
+  const displayScore = stats?.sustainabilityScore !== null && stats?.sustainabilityScore !== undefined
+    ? `${stats.sustainabilityScore}/100`
+    : '—';
 
   return (
     <div className="px-10 pt-8 pb-10 bg-paper">
@@ -75,54 +143,122 @@ export default function Dashboard() {
       </header>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {stats.map(({ label, value, unit, Icon, color }) => (
-          <div key={label} className="bg-white border border-mist rounded-xl p-5 shadow-sm">
-            <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-3 ${color.split(' ')[0]}`}>
-              <Icon className={`w-[18px] h-[18px] ${color.split(' ')[1]}`} />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+        {/* Total Scans */}
+        <div className="bg-white border border-mist rounded-xl p-5 shadow-sm">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 bg-blue-50 text-blue-600">
+            <BarChart2 className="w-[18px] h-[18px]" />
+          </div>
+          <p className="text-2xl font-bold text-ink font-mono tabular-nums">
+            {isLoading && stats === null ? '—' : displayTotalScans}
+          </p>
+          <p className="text-xs text-gray-500 mt-1 font-body">Total Scans</p>
+        </div>
+
+        {/* Total CO2 Tracked */}
+        <div className="bg-white border border-mist rounded-xl p-5 shadow-sm">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 bg-green-50 text-forest">
+            <Leaf className="w-[18px] h-[18px]" />
+          </div>
+          <p className="text-2xl font-bold text-ink font-mono tabular-nums">
+            {isLoading && stats === null ? '—' : displayTotalCo2}
+            <span className="text-sm font-sans font-medium text-gray-500"> kg</span>
+          </p>
+          <p className="text-xs text-gray-500 mt-1 font-body">Total CO₂ Tracked</p>
+        </div>
+
+        {/* This Month */}
+        <div className="bg-white border border-mist rounded-xl p-5 shadow-sm">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 bg-yellow-50 text-yellow-600">
+            <Zap className="w-[18px] h-[18px]" />
+          </div>
+          <p className="text-2xl font-bold text-ink font-mono tabular-nums">
+            {isLoading && stats === null ? '—' : displayThisMonth}
+            <span className="text-sm font-sans font-medium text-gray-500"> kg</span>
+          </p>
+          <p className="text-xs text-gray-500 mt-1 font-body">This Month</p>
+        </div>
+
+        {/* Sustainability Score */}
+        <div className="bg-white border border-mist rounded-xl p-5 shadow-sm flex flex-col justify-between min-h-[140px]">
+          <div>
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 bg-purple-50 text-purple-600">
+              <Award className="w-[18px] h-[18px]" />
             </div>
             <p className="text-2xl font-bold text-ink font-mono tabular-nums">
-              {value}
-              {unit && <span className="text-sm font-sans font-medium text-gray-500">{unit}</span>}
+              {isLoading && stats === null ? '—' : displayScore}
             </p>
-            <p className="text-xs text-gray-500 mt-1 font-body">{label}</p>
+            <p className="text-xs text-gray-500 mt-1 font-body">Sustainability Score</p>
           </div>
-        ))}
+          {(!isLoading || stats !== null) && stats?.sustainabilityScore === null && (
+            <p className="text-[10px] text-gray-400 mt-2 font-body leading-tight">
+              Not enough data yet — scan something to get your first score.
+            </p>
+          )}
+        </div>
+
+        {/* Current Streak */}
+        <div className="bg-white border border-mist rounded-xl p-5 shadow-sm flex flex-col justify-between min-h-[140px]">
+          <div>
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 bg-orange-50 text-orange-600">
+              <span className="text-[18px]">🔥</span>
+            </div>
+            <p className="text-2xl font-bold text-ink font-mono tabular-nums">
+              {user?.currentStreakDays ?? 0}
+            </p>
+            <p className="text-xs text-gray-500 mt-1 font-body">Current Streak</p>
+          </div>
+          <p className="text-[10px] text-gray-400 mt-2 font-body leading-tight">
+            {user?.currentStreakDays > 0 ? `${user.currentStreakDays} day streak!` : 'Start your streak today'}
+          </p>
+        </div>
       </div>
 
       {/* Chart */}
-      <div className="bg-white border border-mist rounded-xl p-6 mb-6 shadow-sm">
+      <div className="bg-white border border-mist rounded-xl p-6 mb-6 shadow-sm relative">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="font-display font-bold text-ink">Carbon Over Time</h2>
             <p className="text-xs text-gray-400 mt-0.5 font-body">Monthly CO₂e emissions (kg)</p>
           </div>
           <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
-            {['3M', '6M', '1Y'].map(r => (
-              <button key={r} onClick={() => setRange(r)}
-                className={`text-xs font-semibold px-3 py-1 rounded-md transition-all font-body ${range === r ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
-                {r}
+            {[
+              { id: '3m', label: '3M' },
+              { id: '6m', label: '6M' },
+              { id: '1y', label: '1Y' }
+            ].map(({ id, label }) => (
+              <button key={id} onClick={() => setSelectedRange(id)}
+                className={`text-xs font-semibold px-3 py-1 rounded-md transition-all font-body ${selectedRange === id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
+                 {label}
               </button>
             ))}
           </div>
         </div>
-        <ResponsiveContainer width="100%" height={220}>
-          <AreaChart data={carbonData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-            <defs>
-              <linearGradient id="co2Grad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="#1a3d2b" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#1a3d2b" stopOpacity={0}    />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af', fontFamily: 'Inter, sans-serif' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: '#9ca3af', fontFamily: 'JetBrains Mono, monospace' }} axisLine={false} tickLine={false} />
-            <Tooltip content={<CustomTooltip />} />
-            <Area type="monotone" dataKey="co2" stroke="#1a3d2b" strokeWidth={2.5}
-              fill="url(#co2Grad)" dot={{ r: 4, fill: '#1a3d2b', strokeWidth: 0 }}
-              activeDot={{ r: 6, fill: '#00c896', strokeWidth: 0 }} />
-          </AreaChart>
-        </ResponsiveContainer>
+        
+        <div className={`transition-opacity duration-200 ${chartLoading ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="co2Grad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="#1a3d2b" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="#1a3d2b" stopOpacity={0}    />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af', fontFamily: 'Inter, sans-serif' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: '#9ca3af', fontFamily: 'JetBrains Mono, monospace' }} axisLine={false} tickLine={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Area type="monotone" dataKey="co2Kg" stroke="#1a3d2b" strokeWidth={2.5}
+                fill="url(#co2Grad)" dot={{ r: 4, fill: '#1a3d2b', strokeWidth: 0 }}
+                activeDot={{ r: 6, fill: '#00c896', strokeWidth: 0 }} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+        {chartLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/20 backdrop-blur-[1px] pointer-events-none">
+            <div className="w-6 h-6 border-2 border-forest border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
       </div>
 
       {/* Recent Scans */}
@@ -132,12 +268,16 @@ export default function Dashboard() {
           <button onClick={() => navigate('/app/upload-center')} className="text-xs text-[#1a7a4a] font-semibold hover:text-forest transition-colors font-body focus:outline-none focus:ring-2 focus:ring-forest/20 rounded">+ New Scan</button>
         </div>
 
-        {recentScans.length === 0 ? (
-          <div className="text-center py-12">
-            <BarChart2 className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-            <p className="text-sm font-semibold text-gray-400 font-body">No scans yet</p>
-            <p className="text-xs text-gray-400 mt-1 font-body">Upload your first file to get started.</p>
-          </div>
+        {scansLoading ? (
+          <Spinner size="medium" />
+        ) : scans.length === 0 ? (
+          <EmptyState
+            icon={BarChart2}
+            title="No scans yet"
+            description="Head to Upload Center to add your first product, receipt, flight ticket, or barcode scan."
+            actionLabel="Go to Upload Center"
+            onAction={() => navigate('/app/upload-center')}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm font-body">
@@ -152,35 +292,97 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-mist/30">
-                {recentScans.map((s, i) => (
-                  <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                {scans.map((s) => (
+                  <tr key={s._id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="py-3 pr-4">
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 bg-forest rounded-lg flex items-center justify-center flex-shrink-0">
                           <TrendingDown className="w-3.5 h-3.5 text-white" />
                         </div>
-                        <span className="font-semibold text-gray-900 truncate max-w-[140px]">{s.name}</span>
+                        <span className="font-semibold text-gray-900 truncate max-w-[140px]" title={s.type === 'barcode' ? `Barcode: ${s.barcodeValue || '—'}` : s.originalFilename}>
+                          {s.type === 'barcode' ? `Barcode: ${s.barcodeValue || '—'}` : s.originalFilename}
+                        </span>
                       </div>
                     </td>
-                    <td className="py-3 pr-4 text-gray-500 text-xs">{s.category}</td>
+                    <td className="py-3 pr-4 text-gray-500 text-xs">{s.category || 'Pending'}</td>
                     <td className="py-3 pr-4 text-gray-900">
-                      <span className="font-mono font-bold tabular-nums">{s.co2Val}</span>
-                      <span className="font-mono text-xs text-gray-500 ml-0.5">{s.co2Unit}</span>
+                      <span className="font-mono font-bold tabular-nums">
+                        {s.co2Kg != null ? s.co2Kg : '—'}
+                      </span>
+                      {s.co2Kg != null && <span className="font-mono text-xs text-gray-500 ml-0.5"> kg</span>}
                     </td>
-                    <td className="py-3 pr-4"><ScoreBadge score={s.score} /></td>
                     <td className="py-3 pr-4">
-                      {s.status === 'Done'
-                        ? <span className="flex items-center gap-1 text-xs text-green-600 font-medium"><CheckCircle2 className="w-3.5 h-3.5" /> Done</span>
-                        : <span className="flex items-center gap-1 text-xs text-yellow-500 font-medium"><Clock className="w-3.5 h-3.5" /> Processing</span>
-                      }
+                      <ScoreBadge score={s.score} />
                     </td>
-                    <td className="py-3 text-xs text-gray-400 font-mono tabular-nums">{s.date}</td>
+                    <td className="py-3 pr-4">
+                      {s.status === 'ocr_done' ? (
+                        <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Done
+                        </span>
+                      ) : s.status === 'processing' ? (
+                        <span className="flex items-center gap-1 text-xs text-yellow-500 font-medium">
+                          <Clock className="w-3.5 h-3.5 animate-spin" /> Processing
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-xs text-red-500 font-medium">
+                          <X className="w-3.5 h-3.5" /> Failed
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 text-xs text-gray-400 font-mono tabular-nums">
+                      {formatDate(s.createdAt)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
+      </div>
+
+      {/* Achievements Section */}
+      <div className="bg-white border border-mist rounded-xl p-6 shadow-sm mt-6">
+        <h2 className="font-display font-bold text-ink mb-5 text-sm uppercase tracking-wider flex items-center gap-2">
+          <Award className="w-4 h-4 text-forest" /> Sustainability Achievements
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          {BADGE_CATALOG.map((badge) => {
+            const isEarned = user?.badges?.includes(badge.key);
+            return (
+              <div
+                key={badge.key}
+                className={`relative group flex flex-col items-center justify-center p-4 border rounded-2xl transition-all text-center cursor-help ${
+                  isEarned
+                    ? 'border-forest/20 bg-forest/5 text-ink opacity-100 shadow-sm'
+                    : 'border-mist bg-gray-50/50 text-gray-400 opacity-50'
+                }`}
+              >
+                <div className="text-3xl mb-2 select-none filter transition-all duration-300 group-hover:scale-110">
+                  {badge.emoji}
+                </div>
+                <span className="font-display font-bold text-[11px] leading-tight block">
+                  {badge.label}
+                </span>
+                
+                {/* Tooltip on Hover */}
+                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-48 bg-gray-900 text-white text-[10px] p-2.5 rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 pointer-events-none text-center">
+                  <p className="font-bold mb-0.5">{badge.description}</p>
+                  <p className="text-gray-400 text-[9px]">{badge.condition}</p>
+                  {!isEarned && (
+                    <span className="text-amber-500 font-bold block mt-1 uppercase tracking-wider text-[8px]">
+                      Locked
+                    </span>
+                  )}
+                  {isEarned && (
+                    <span className="text-green-400 font-bold block mt-1 uppercase tracking-wider text-[8px]">
+                      Unlocked!
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

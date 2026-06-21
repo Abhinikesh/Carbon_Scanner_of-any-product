@@ -23,7 +23,7 @@ const protect = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Invalid token' });
     }
 
-    const user = await User.findById(decoded.id).select('-password');
+    const user = await User.findById(decoded.id).select('-password -refreshTokenHash');
     if (!user) {
       return res.status(401).json({ success: false, message: 'User no longer exists' });
     }
