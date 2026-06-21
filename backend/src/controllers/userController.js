@@ -85,6 +85,9 @@ const getLeaderboard = async (req, res, next) => {
       .limit(10)
       .select('name avatar totalScans totalCO2 badges');
     return sendSuccess(res, 200, 'Leaderboard fetched', { leaders });
+  } catch (error) {
+    next(error);
+  }
 };
 
 /**
