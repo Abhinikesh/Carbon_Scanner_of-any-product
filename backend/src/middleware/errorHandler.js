@@ -14,6 +14,12 @@ const errorHandler = (err, req, res, next) => {
     message = 'Invalid ID format';
   }
 
+  // Multer limit file size error
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    statusCode = 400;
+    message = 'File size limit exceeded (Max 10MB)';
+  }
+
   // Mongoose duplicate key
   if (err.code === 11000) {
     statusCode = 400;

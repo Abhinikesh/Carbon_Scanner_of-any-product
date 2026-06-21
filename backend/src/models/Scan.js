@@ -1,42 +1,57 @@
 const mongoose = require('mongoose');
 
-const alternativeSchema = new mongoose.Schema({
-  name: String,
-  co2Reduction_percent: Number,
-  reason: String,
-});
-
-const scanSchema = new mongoose.Schema(
-  {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    type: {
-      type: String,
-      enum: ['product', 'food', 'receipt', 'flight', 'barcode'],
-      required: true,
-    },
-    uploadedImageUrl: { type: String, required: true },
-    recognizedItem: {
-      name: { type: String, default: 'Unknown' },
-      category: { type: String, default: 'general' },
-      weight: { type: Number, default: 1 },
-      quantity: { type: Number, default: 1 },
-      confidence: { type: Number, default: 0 },
-    },
-    co2Estimate: {
-      value: { type: Number, default: 0 },
-      unit: { type: String, default: 'kg CO2e' },
-      source: { type: String, default: 'local_estimate' },
-    },
-    sustainabilityIndex: {
-      score: { type: Number, default: 0 },
-      label: { type: String, default: 'unknown' },
-      color: { type: String, default: '#A8B2C1' },
-    },
-    alternatives: [alternativeSchema],
-    rawAIResponse: { type: Object },
-    aiFailed: { type: Boolean, default: false },
+const scanSchema = new mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true
   },
-  { timestamps: true }
-);
+  type: {
+    type: String,
+    enum: ['product', 'receipt', 'flight', 'barcode'],
+    required: true
+  },
+  originalFilename: {
+    type: String
+  },
+  status: {
+    type: String,
+    enum: ['processing', 'ocr_done', 'failed'],
+    default: 'processing'
+  },
+  rawText: {
+    type: String,
+    default: ''
+  },
+  barcodeValue: {
+    type: String,
+    default: null
+  },
+  parsedFields: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
+  },
+  errorMessage: {
+    type: String,
+    default: null
+  },
+  co2Kg: {
+    type: Number,
+    default: null
+  },
+  category: {
+    type: String,
+    default: null
+  },
+  score: {
+    type: Number,
+    default: null
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
 
 module.exports = mongoose.model('Scan', scanSchema);

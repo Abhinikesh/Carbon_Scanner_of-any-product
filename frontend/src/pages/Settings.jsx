@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { User, Mail, Bell, Moon, Save, CheckCircle2 } from 'lucide-react';
+import { User as UserIcon, Mail, Bell, Moon, Save, CheckCircle2 } from 'lucide-react';
 import { Toast } from '../App.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Settings() {
-  const [form, setForm]         = useState({ name: 'Felix Green', email: 'felix@climatelens.io' });
+  const { user } = useAuth();
+  const [form, setForm]         = useState({ name: user?.name || '', email: user?.email || '' });
   const [notifications, setNotifications] = useState(true);
   const [darkMode,       setDarkMode]      = useState(false);
   const [toast,          setToast]         = useState(null);
@@ -37,7 +39,7 @@ export default function Settings() {
       <form onSubmit={handleSave}>
         <div className="bg-white rounded-xl p-6 mb-5">
           <h2 className="font-bold text-gray-900 mb-5 flex items-center gap-2">
-            <User className="w-4 h-4 text-[#1a3d2b]" /> Profile Settings
+            <UserIcon className="w-4 h-4 text-[#1a3d2b]" /> Profile Settings
           </h2>
           <div className="space-y-4">
             <div>

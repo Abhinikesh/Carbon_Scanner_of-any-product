@@ -32,7 +32,7 @@ app.use(generalLimiter);
 
 // Mount original routes
 app.use('/api/auth', require('./src/routes/authRoutes'));
-app.use('/api/scan', require('./src/routes/scanRoutes'));
+app.use('/api/scans', require('./src/routes/scanRoutes'));
 app.use('/api/user', require('./src/routes/userRoutes'));
 app.use('/api/carbon', require('./src/routes/carbonRoutes'));
 
