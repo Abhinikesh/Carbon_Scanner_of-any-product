@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { register, login, refresh, logout, getMe } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
-const { authLimiter } = require('../middleware/rateLimiter');
+const { authLimiter } = require('../middleware/rateLimiters');
+
 
 // Public auth routes
 router.post('/register', authLimiter, register);

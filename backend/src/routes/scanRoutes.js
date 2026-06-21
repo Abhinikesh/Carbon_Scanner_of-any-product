@@ -3,6 +3,8 @@ const router = express.Router();
 const scanController = require('../controllers/scanController');
 const { protect } = require('../middleware/authMiddleware');
 const uploadSingle = require('../middleware/upload');
+const validateObjectId = require('../utils/validateObjectId');
+const { scanCreateLimiter } = require('../middleware/rateLimiters');
 
 // Protect all routes
 router.use(protect);
@@ -17,12 +19,16 @@ router.get('/chart', scanController.getScanChart);
 router.get('/', scanController.listScans);
 
 // GET /api/scans/:id - Get single scan details
-router.get('/:id', scanController.getScan);
+router.get('/:id', validateObjectId('id'), scanController.getScan);
+
+// GET /api/scans/:id/alternative - Get alternative suggestion
+router.get('/:id/alternative', validateObjectId('id'), scanController.getScanAlternative);
 
 // POST /api/scans - Upload scan (file or barcode JSON)
-router.post('/', uploadSingle, scanController.createScan);
+router.post('/', scanCreateLimiter, uploadSingle, scanController.createScan);
 
 // PATCH /api/scans/:id/category - Update scan category and recalculate CO2
-router.patch('/:id/category', scanController.updateScanCategory);
+router.patch('/:id/category', validateObjectId('id'), scanController.updateScanCategory);
 
 module.exports = router;
+

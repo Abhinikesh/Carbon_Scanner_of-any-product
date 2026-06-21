@@ -40,16 +40,28 @@ async function createScan(req, res, next) {
       try {
         const carbonResult = await calculateCarbon(type, {}, barcodeValue);
         scan.category = carbonResult.category;
+        scan.categoryKey = carbonResult.categoryKey;
         scan.co2Kg = carbonResult.co2Kg;
         scan.score = carbonResult.score;
         scan.parsedFields = carbonResult.note ? { note: carbonResult.note } : {};
+        
+        const details = {};
+        const extraKeys = ['distanceKm', 'estimatedAmount', 'note', 'calculationMethod'];
+        for (const k of extraKeys) {
+          if (carbonResult[k] !== undefined) {
+            details[k] = carbonResult[k];
+          }
+        }
+        scan.calculationDetails = details;
         scan.status = 'ocr_done';
       } catch (calcError) {
         console.error('[Carbon Engine] Barcode calculation error:', calcError.message);
         scan.category = 'Unknown product';
+        scan.categoryKey = null;
         scan.co2Kg = null;
         scan.score = null;
         scan.parsedFields = { note: `Carbon calculation failed: ${calcError.message}` };
+        scan.calculationDetails = {};
         scan.status = 'ocr_done';
       }
 
@@ -115,6 +127,7 @@ async function createScan(req, res, next) {
       try {
         const carbonResult = await calculateCarbon(type, parsed, null);
         scan.category = carbonResult.category;
+        scan.categoryKey = carbonResult.categoryKey;
         scan.co2Kg = carbonResult.co2Kg;
         scan.score = carbonResult.score;
         
@@ -124,16 +137,27 @@ async function createScan(req, res, next) {
           ...(carbonResult.distanceKm != null ? { distanceKm: carbonResult.distanceKm } : {}),
           ...(carbonResult.note ? { note: carbonResult.note } : {})
         };
+
+        const details = {};
+        const extraKeys = ['distanceKm', 'estimatedAmount', 'note', 'calculationMethod'];
+        for (const k of extraKeys) {
+          if (carbonResult[k] !== undefined) {
+            details[k] = carbonResult[k];
+          }
+        }
+        scan.calculationDetails = details;
         scan.status = 'ocr_done';
       } catch (calcError) {
         console.error('[Carbon Engine] Calculation error:', calcError.message);
         scan.category = null;
+        scan.categoryKey = null;
         scan.co2Kg = null;
         scan.score = null;
         scan.parsedFields = {
           ...parsed,
           note: `Carbon calculation failed: ${calcError.message}`
         };
+        scan.calculationDetails = {};
         scan.status = 'ocr_done'; // OCR succeeded, so set scan to done
       }
 
@@ -398,6 +422,7 @@ async function updateScanCategory(req, res, next) {
       const calc = calculateReceiptCarbon(matchedKey, amount);
 
       scan.category = calc.category;
+      scan.categoryKey = matchedKey;
       scan.co2Kg = calc.co2Kg;
       scan.score = calc.score;
       scan.manuallyCorrected = true;
@@ -448,6 +473,7 @@ async function updateScanCategory(req, res, next) {
       if (isMaterial) {
         const calc = calculateProductCarbon(matchedKey);
         scan.category = calc.category;
+        scan.categoryKey = matchedKey;
         scan.co2Kg = calc.co2Kg;
         scan.score = calc.score;
       } else if (isFood) {
@@ -455,6 +481,7 @@ async function updateScanCategory(req, res, next) {
         // Score: lower CO2 = higher score
         const score = Math.min(Math.max(Math.round(100 - (co2Kg / 60) * 90), 10), 95);
         scan.category = matchedKey.charAt(0).toUpperCase() + matchedKey.slice(1);
+        scan.categoryKey = matchedKey;
         scan.co2Kg = co2Kg;
         scan.score = score;
       }
@@ -479,11 +506,38 @@ async function updateScanCategory(req, res, next) {
   }
 }
 
+/**
+ * Retrieves a calculated greener alternative swap for a scan by ID.
+ *
+ * @route GET /api/scans/:id/alternative
+ * @access Private
+ */
+async function getScanAlternative(req, res, next) {
+  try {
+    const scan = await Scan.findOne({ _id: req.params.id, user: req.user.id });
+    if (!scan) {
+      return res.status(404).json({ success: false, message: 'Scan not found' });
+    }
+
+    const { getAlternative } = require('../utils/alternativeEngine');
+    const result = await getAlternative(scan);
+
+    return res.status(200).json({
+      success: true,
+      ...result
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   createScan,
   listScans,
   getScan,
   updateScanCategory,
   getScanStats,
-  getScanChart
+  getScanChart,
+  getScanAlternative
 };
+

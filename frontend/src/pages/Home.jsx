@@ -4,9 +4,11 @@ import {
   CloudUpload, BarChart2, Leaf, ArrowRight,
   ShieldCheck, Zap, Globe
 } from 'lucide-react';
+import { useScanStats } from '../context/ScanStatsContext.jsx';
 
 export default function Home() {
   const navigate = useNavigate();
+  const { stats, isLoading } = useScanStats();
 
   const features = [
     { Icon: CloudUpload, title: 'Smart Upload',       text: 'Upload receipts, flight tickets, product images, and barcodes for instant CO₂ analysis.' },
@@ -16,6 +18,9 @@ export default function Home() {
     { Icon: Zap,         title: 'Instant Results',    text: 'OCR extraction matched against open emission factors in under 3 seconds.' },
     { Icon: Globe,       title: 'Global Standards',   text: 'Calculations follow GHG Protocol Corporate Standard and Climatiq emission factors.' },
   ];
+
+  const displayThisMonth = isLoading ? '—' : stats?.thisMonthCo2Kg ?? 0;
+  const displayTotalScans = isLoading ? '—' : stats?.totalScans ?? 0;
 
   return (
     <div className="px-10 pt-12 pb-16 bg-paper">
@@ -52,8 +57,8 @@ export default function Home() {
       {/* Stats strip */}
       <div className="grid grid-cols-3 gap-4 mb-12 max-w-xl">
         {[
-          { value: '42', unit: 'kg', label: 'Your CO₂ This Month' },
-          { value: '12', unit: '',   label: 'Scans Analysed' },
+          { value: displayThisMonth, unit: 'kg', label: 'Your CO₂ This Month' },
+          { value: displayTotalScans, unit: '',   label: 'Scans Analysed' },
           { value: '3',  unit: '',   label: 'Open Databases' },
         ].map(({ value, unit, label }) => (
           <div key={label} className="bg-white border border-mist rounded-xl p-4 text-center">

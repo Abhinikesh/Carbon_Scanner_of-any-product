@@ -1,3 +1,9 @@
+/**
+ * Centralized Error Handler Middleware.
+ * Always logs the full error stack to the server console,
+ * maps specific Mongoose/JWT/Multer errors to 400/401 statuses,
+ * and hides the stack trace from the client in production.
+ */
 const errorHandler = (err, req, res, next) => {
   let statusCode = err.statusCode || 500;
   let message = err.message || 'Internal Server Error';
@@ -37,12 +43,20 @@ const errorHandler = (err, req, res, next) => {
     message = 'Token expired';
   }
 
-  console.error(`[ERROR] ${statusCode} - ${message}`);
+  // Always log the full error with stack trace to console for diagnostics
+  console.error('[ERROR]', err);
 
-  res.status(statusCode).json({
+  const responseBody = {
     success: false,
     message
-  });
+  };
+
+  // Only expose the stack trace to client in development environment
+  if (process.env.NODE_ENV === 'development') {
+    responseBody.stack = err.stack;
+  }
+
+  res.status(statusCode).json(responseBody);
 };
 
 module.exports = errorHandler;

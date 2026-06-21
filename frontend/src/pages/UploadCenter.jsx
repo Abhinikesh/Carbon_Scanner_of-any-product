@@ -2,15 +2,16 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   ShoppingCart, Receipt, Plane, Barcode, FileUp, Plus,
   Brain, FileText, CheckCircle2, ShieldCheck, CheckCheck,
-  FileSearch, ScanLine, X, Loader2, AlertCircle, ChevronDown, ChevronUp, Recycle
+  FileSearch, ScanLine, X, Loader2, AlertCircle, ChevronDown, ChevronUp, Recycle, Leaf
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Toast } from '../App.jsx';
 import api from '../lib/api.js'; // Use the authenticated Axios client from Part 5
 import { useScanStats } from '../context/ScanStatsContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
-import { convertPdfFirstPageToFile } from '../lib/pdfToImage';
 import { decodeBarcodeFromFile } from '../lib/barcodeScanner';
+import { submitScan } from '../lib/scanSubmission';
+import ScoreBadge from '../components/common/ScoreBadge.jsx';
 
 const TABS = [
   { id: 'product', label: 'Product', Icon: ShoppingCart },
@@ -91,6 +92,38 @@ export default function UploadCenter() {
   const { refreshUser } = useAuth();
   const [unlockedBadges, setUnlockedBadges] = useState([]);
   const [updatingCategory, setUpdatingCategory] = useState(false);
+
+  const [activeAlternativeId, setActiveAlternativeId] = useState(null);
+  const [alternativeData, setAlternativeData] = useState(null);
+  const [altLoading, setAltLoading] = useState(false);
+  const [altError, setAltError] = useState(null);
+
+  async function handleFetchAlternative(scanId) {
+    if (activeAlternativeId === scanId) {
+      setActiveAlternativeId(null);
+      setAlternativeData(null);
+      return;
+    }
+
+    setActiveAlternativeId(scanId);
+    setAlternativeData(null);
+    setAltError(null);
+    setAltLoading(true);
+
+    try {
+      const res = await api.get(`/scans/${scanId}/alternative`);
+      if (res.data && res.data.success) {
+        setAlternativeData(res.data);
+      } else {
+        setAltError(res.data?.message || 'Failed to load alternative suggestion.');
+      }
+    } catch (err) {
+      console.error('[UploadCenter] Failed to fetch alternative:', err);
+      setAltError(err.response?.data?.message || err.message || 'Failed to load alternative suggestion.');
+    } finally {
+      setAltLoading(false);
+    }
+  }
 
   const fileInputRef = useRef(null);
   const addMoreInputRef = useRef(null);
@@ -209,39 +242,22 @@ export default function UploadCenter() {
     setLiveActivity(prev => [tempScan, ...prev.slice(0, 4)]);
 
     try {
-      let response;
-      if (activeTab === 'barcode') {
-        const barcodeVal = barcodeResult.value ? barcodeResult.value.trim() : '';
-        if (!barcodeVal) {
-          throw new Error("Couldn't read the barcode — enter it manually");
-        }
+      const result = await submitScan({
+        type: activeTab,
+        file: files[0]?.file,
+        barcodeValueOverride: activeTab === 'barcode' ? barcodeResult.value : null
+      });
 
-        response = await api.post('/scans', {
-          type: 'barcode',
-          barcodeValue: barcodeVal
-        });
-      } else {
-        let fileToUpload = files[0].file;
-        
-        // Convert PDF to image client-side if needed
-        if (fileToUpload.type === 'application/pdf') {
-          fileToUpload = await convertPdfFirstPageToFile(fileToUpload);
-        }
-
-        const formData = new FormData();
-        formData.append('file', fileToUpload);
-        formData.append('type', activeTab);
-
-        response = await api.post('/scans', formData);
+      if (!result.success) {
+        throw new Error(result.error);
       }
 
       setSuccess(true);
       showToast('File processed successfully!', 'success');
 
       // Check for newly earned badges in the response
-      const resData = response?.data;
-      if (resData && resData.newBadges && resData.newBadges.length > 0) {
-        const newBadgesList = resData.newBadges;
+      const newBadgesList = result.newBadges;
+      if (newBadgesList && newBadgesList.length > 0) {
         setUnlockedBadges(prev => [...prev, ...newBadgesList]);
         setTimeout(() => {
           setUnlockedBadges(prev => prev.filter(b => !newBadgesList.some(nb => nb.key === b.key)));
@@ -266,7 +282,7 @@ export default function UploadCenter() {
     } catch (err) {
       console.error('[UploadCenter] Processing error:', err);
       
-      const errorMsg = err.response?.data?.message || err.message || 'Processing failed';
+      const errorMsg = err.message || 'Processing failed';
 
       // Mark the placeholder item as failed and attach error description
       setLiveActivity(prev =>
@@ -601,16 +617,8 @@ export default function UploadCenter() {
                             {/* Category & CO2 emissions live tracking details */}
                             {scan.status === 'ocr_done' && (
                               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                {/* Score dot indicator matching dashboard score ranges */}
-                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                                  scan.score == null 
-                                    ? 'bg-gray-400' 
-                                    : scan.score >= 70 
-                                      ? 'bg-green-500' 
-                                      : scan.score >= 40 
-                                        ? 'bg-yellow-500' 
-                                        : 'bg-red-500'
-                                }`} />
+                                {/* Score Badge component matching dashboard score ranges */}
+                                <ScoreBadge score={scan.score} />
                                 
                                 <span className="text-[11px] font-semibold text-gray-700 truncate max-w-[120px]">
                                   {scan.category || 'Unidentified'}
@@ -823,20 +831,48 @@ export default function UploadCenter() {
                             </div>
                           )}
 
-                          {/* Disposal Guide Quick Link */}
-                          {scan.category && scan.type !== 'flight' && (
-                            <div className="mt-3 pt-3 border-t border-dashed border-mist flex justify-between items-center">
-                              <div className="flex flex-col">
-                                <span className="text-[10px] uppercase font-bold text-gray-400">Waste Classification</span>
-                                <span className="text-gray-900 font-bold capitalize">{scan.category.replace(/_/g, ' ')}</span>
+                          {/* Disposal Guide & Greener Alternative Quick Links */}
+                          {scan.status === 'ocr_done' && (
+                            <div className="mt-3 pt-3 border-t border-dashed border-mist flex flex-col gap-3">
+                              <div className="flex justify-between items-center flex-wrap gap-2">
+                                <div className="flex flex-col">
+                                  <span className="text-[10px] uppercase font-bold text-gray-400">Classification</span>
+                                  <span className="text-gray-900 font-bold capitalize">{scan.category?.replace(/_/g, ' ') || 'General Scan'}</span>
+                                </div>
+                                <div className="flex gap-2">
+                                  {scan.type !== 'flight' && scan.category && (
+                                    <button
+                                      onClick={() => navigate(`/app/recycle?query=${encodeURIComponent(scan.category)}&scanId=${scan._id}`)}
+                                      className="bg-forest/10 hover:bg-forest/20 text-forest font-bold text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                                    >
+                                      <Recycle className="w-3.5 h-3.5" />
+                                      Disposal Guide
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleFetchAlternative(scan._id)}
+                                    className="bg-green-600 hover:bg-green-700 text-white font-bold text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                                  >
+                                    <Leaf className="w-3.5 h-3.5" />
+                                    See Alternative
+                                  </button>
+                                </div>
                               </div>
-                              <button
-                                onClick={() => navigate(`/app/recycle?query=${encodeURIComponent(scan.category)}&scanId=${scan._id}`)}
-                                className="bg-forest/10 hover:bg-forest/20 text-forest font-bold text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
-                              >
-                                <Recycle className="w-3.5 h-3.5" />
-                                Disposal Guide
-                              </button>
+
+                              {/* Alternative Details Sub-panel */}
+                              {activeAlternativeId === scan._id && (
+                                <div className="bg-paper border border-mist rounded-lg p-3 text-xs mt-1 animate-fade-in">
+                                  {altLoading ? (
+                                    <div className="flex items-center gap-2 text-gray-500 font-body py-1">
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Fetching alternative...
+                                    </div>
+                                  ) : altError ? (
+                                    <p className="text-red-500 font-semibold font-body py-1">{altError}</p>
+                                  ) : alternativeData ? (
+                                    <AlternativeDetails data={alternativeData} />
+                                  ) : null}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -872,6 +908,71 @@ export default function UploadCenter() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+export function AlternativeDetails({ data }) {
+  if (!data) return null;
+  const { hasAlternative, suggestion, message, currentCo2Kg, alternativeCo2Kg, savingsKg, savingsPercent, tip, note, currentCo2PerKg, alternativeCo2PerKg } = data;
+
+  if (!hasAlternative) {
+    return (
+      <div className="text-gray-500 italic py-1 font-body text-left">
+        {message || "No alternative suggestion available for this scan."}
+      </div>
+    );
+  }
+
+  // Check if it's the receipt-type tip (no numbers)
+  if (tip) {
+    return (
+      <div className="flex flex-col gap-2 font-body text-left">
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-3">
+          <p className="font-bold text-xs uppercase tracking-wider mb-1">🌿 Smart Swaps Tip</p>
+          <p className="text-xs leading-relaxed">{tip}</p>
+        </div>
+        {note && <p className="text-[10px] text-gray-400 italic mt-0.5">{note}</p>}
+      </div>
+    );
+  }
+
+  // It's a calculated numerical suggestion (product, flight, barcode)
+  const isBarcodeSwap = currentCo2PerKg !== undefined;
+
+  return (
+    <div className="flex flex-col gap-3 font-body text-left">
+      <div className="bg-green-50 border border-green-200 text-[#14231B] rounded-lg p-3">
+        <p className="font-bold text-xs uppercase tracking-wider text-green-700 mb-1">🌿 Carbon Swap Recommendation</p>
+        <p className="font-bold text-sm mb-1">{suggestion}</p>
+        {message && <p className="text-xs text-gray-600 leading-relaxed mb-2">{message}</p>}
+        
+        <div className="flex items-center justify-between border-t border-green-200/60 pt-2.5 mt-2 flex-wrap gap-2">
+          {/* Numbers */}
+          <div className="flex items-center gap-2.5 text-xs text-gray-500 font-mono">
+            {isBarcodeSwap ? (
+              <>
+                <span className="line-through">{currentCo2PerKg} kg CO₂/kg</span>
+                <span>→</span>
+                <span className="font-bold text-green-700">{alternativeCo2PerKg} kg CO₂/kg</span>
+              </>
+            ) : (
+              <>
+                <span className="line-through">{currentCo2Kg} kg</span>
+                <span>→</span>
+                <span className="font-bold text-green-700">{alternativeCo2Kg} kg</span>
+              </>
+            )}
+          </div>
+          {/* Highlighted Percent */}
+          {savingsPercent !== undefined && (
+            <span className="bg-green-600 text-white font-bold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider">
+              {savingsPercent}% less CO₂
+            </span>
+          )}
+        </div>
+      </div>
+      {note && <p className="text-[10px] text-gray-400 italic mt-0.5">{note}</p>}
     </div>
   );
 }

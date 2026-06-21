@@ -38,6 +38,7 @@ function calculateReceiptCarbon(categoryKey, amount) {
   );
   return {
     category: emissionFactors.spendCategories[categoryKey].label,
+    categoryKey,
     co2Kg,
     score,
     calculationMethod: 'spend-based'
@@ -60,6 +61,7 @@ function calculateProductCarbon(materialKey) {
   );
   return {
     category: emissionFactors.materialCategories[materialKey].label,
+    categoryKey: materialKey,
     co2Kg,
     score,
     calculationMethod: 'material-average'
@@ -76,6 +78,7 @@ function calculateFlightCarbon(code1, code2) {
   if (!airport1 || !airport2) {
     return {
       category: 'Flight (unverified route)',
+      categoryKey: 'flight',
       co2Kg: null,
       score: null,
       calculationMethod: 'insufficient-data',
@@ -99,6 +102,7 @@ function calculateFlightCarbon(code1, code2) {
 
   return {
     category: `Flight (${code1} → ${code2})`,
+    categoryKey: 'flight',
     co2Kg,
     score,
     distanceKm: round(distanceKm),
@@ -120,6 +124,7 @@ async function calculateBarcodeCarbon(barcodeValue) {
     if (data.status !== 1 || !data.product) {
       return {
         category: 'Unknown product',
+        categoryKey: null,
         co2Kg: null,
         score: null,
         calculationMethod: 'not-found',
@@ -131,6 +136,20 @@ async function calculateBarcodeCarbon(barcodeValue) {
     console.log('[Carbon Engine] OFF ecoscore_data:', JSON.stringify(product.ecoscore_data));
 
     const categoryName = product.product_name || product.categories || 'Unknown product';
+
+    // Parse product details to match foodPerKg keys
+    const nameStr = (product.product_name || '').toLowerCase();
+    const tagsStr = (product.categories_tags || []).join(' ').toLowerCase();
+    const combinedStr = `${nameStr} ${tagsStr}`;
+
+    let categoryKey = null;
+    const foodKeys = ['beef', 'lamb', 'pork', 'poultry', 'fish', 'eggs', 'cheese', 'milk', 'rice', 'tofu', 'vegetables', 'fruit', 'legumes', 'grains'];
+    for (const key of foodKeys) {
+      if (combinedStr.includes(key)) {
+        categoryKey = key;
+        break;
+      }
+    }
 
     // Priority 1: agribalyse co2_total
     const agribalyseCo2 = product.ecoscore_data?.agribalyse?.co2_total;
@@ -147,6 +166,7 @@ async function calculateBarcodeCarbon(barcodeValue) {
 
       return {
         category: categoryName,
+        categoryKey,
         co2Kg,
         score,
         calculationMethod: 'openfoodfacts-agribalyse'
@@ -171,6 +191,7 @@ async function calculateBarcodeCarbon(barcodeValue) {
 
       return {
         category: categoryName,
+        categoryKey,
         co2Kg,
         score,
         calculationMethod: 'openfoodfacts-ecoscore-grade'
@@ -180,6 +201,7 @@ async function calculateBarcodeCarbon(barcodeValue) {
     // Priority 3: neither present
     return {
       category: categoryName,
+      categoryKey,
       co2Kg: null,
       score: null,
       calculationMethod: 'no-carbon-data',
@@ -189,6 +211,7 @@ async function calculateBarcodeCarbon(barcodeValue) {
     console.error('[Carbon Engine] Error fetching from Open Food Facts:', error.message);
     return {
       category: 'Unknown product',
+      categoryKey: null,
       co2Kg: null,
       score: null,
       calculationMethod: 'lookup-failed',
@@ -243,6 +266,7 @@ async function calculateCarbon(scanType, parsedFields = {}, barcodeValue = null)
     if (validCodes.length < 2) {
       return {
         category: 'Flight (unverified route)',
+        categoryKey: 'flight',
         co2Kg: null,
         score: null,
         calculationMethod: 'insufficient-data',
@@ -259,6 +283,7 @@ async function calculateCarbon(scanType, parsedFields = {}, barcodeValue = null)
 
   return {
     category: 'General Scan',
+    categoryKey: null,
     co2Kg: null,
     score: null,
     calculationMethod: 'unknown'

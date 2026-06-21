@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   BarChart2, Leaf, Zap, Award, CloudUpload,
-  CheckCircle2, Clock, TrendingDown, X
+  CheckCircle2, Clock, TrendingDown, X, Recycle, Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -13,7 +13,9 @@ import { useAuth } from '../context/AuthContext.jsx';
 import api from '../lib/api';
 import Spinner from '../components/common/Spinner.jsx';
 import EmptyState from '../components/common/EmptyState.jsx';
+import ScoreBadge from '../components/common/ScoreBadge.jsx';
 import { BADGE_CATALOG } from '../data/badgeCatalog.js';
+import { AlternativeDetails } from './UploadCenter.jsx';
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload?.length) {
@@ -28,26 +30,6 @@ const CustomTooltip = ({ active, payload, label }) => {
   }
   return null;
 };
-
-function ScoreBadge({ score }) {
-  if (score === null || score === undefined) {
-    return (
-      <span className="text-xs font-bold px-2 py-0.5 rounded-full text-gray-500 bg-gray-100 font-mono">
-        —
-      </span>
-    );
-  }
-  const color = score >= 70 
-    ? 'text-green-600 bg-green-50' 
-    : score >= 40 
-      ? 'text-yellow-600 bg-yellow-50' 
-      : 'text-red-500 bg-red-50';
-  return (
-    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${color}`}>
-      <span className="font-mono tabular-nums">{score}</span>
-    </span>
-  );
-}
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -119,6 +101,32 @@ export default function Dashboard() {
       active = false;
     };
   }, []);
+
+  const [activeAlternativeScan, setActiveAlternativeScan] = useState(null);
+  const [altData, setAltData] = useState(null);
+  const [altLoading, setAltLoading] = useState(false);
+  const [altError, setAltError] = useState(null);
+
+  async function handleShowAlternative(scan) {
+    setActiveAlternativeScan(scan);
+    setAltData(null);
+    setAltError(null);
+    setAltLoading(true);
+
+    try {
+      const res = await api.get(`/scans/${scan._id}/alternative`);
+      if (res.data && res.data.success) {
+        setAltData(res.data);
+      } else {
+        setAltError(res.data?.message || 'Failed to load alternative suggestion.');
+      }
+    } catch (err) {
+      console.error('[Dashboard] Failed to fetch alternative:', err);
+      setAltError(err.response?.data?.message || err.message || 'Failed to load alternative suggestion.');
+    } finally {
+      setAltLoading(false);
+    }
+  }
 
   const displayTotalScans = stats?.totalScans ?? 0;
   const displayTotalCo2 = stats?.totalCo2Kg ?? 0;
@@ -304,7 +312,27 @@ export default function Dashboard() {
                         </span>
                       </div>
                     </td>
-                    <td className="py-3 pr-4 text-gray-500 text-xs">{s.category || 'Pending'}</td>
+                    <td className="py-3 pr-4 text-xs">
+                      <div className="text-gray-900 font-semibold truncate max-w-[120px]">{s.category || 'Pending'}</div>
+                      {s.status === 'ocr_done' && (
+                        <div className="flex gap-2 mt-1 flex-wrap">
+                          {s.type !== 'flight' && s.category && (
+                            <button
+                              onClick={() => navigate(`/app/recycle?query=${encodeURIComponent(s.category)}&scanId=${s._id}`)}
+                              className="text-[10px] text-[#1a7a4a] hover:underline flex items-center gap-0.5 font-bold cursor-pointer"
+                            >
+                              <Recycle className="w-2.5 h-2.5" /> Disposal
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleShowAlternative(s)}
+                            className="text-[10px] text-[#1a7a4a] hover:underline flex items-center gap-0.5 font-bold cursor-pointer"
+                          >
+                            <Leaf className="w-2.5 h-2.5" /> Alternative
+                          </button>
+                        </div>
+                      )}
+                    </td>
                     <td className="py-3 pr-4 text-gray-900">
                       <span className="font-mono font-bold tabular-nums">
                         {s.co2Kg != null ? s.co2Kg : '—'}
@@ -384,6 +412,31 @@ export default function Dashboard() {
           })}
         </div>
       </div>
+
+      {/* Greener Alternative Modal Overlay */}
+      {activeAlternativeScan && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white border border-mist rounded-2xl max-w-md w-full shadow-2xl p-6 relative font-body">
+            <button
+              onClick={() => setActiveAlternativeScan(null)}
+              className="absolute top-4 right-4 p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 focus:outline-none"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="font-display font-bold text-lg text-ink mb-4">Greener Alternative</h3>
+            
+            {altLoading ? (
+              <div className="flex items-center gap-2 text-gray-500 py-6 justify-center">
+                <Loader2 className="w-5 h-5 animate-spin" /> Fetching suggestion...
+              </div>
+            ) : altError ? (
+              <div className="text-red-500 font-semibold py-4 text-center">{altError}</div>
+            ) : (
+              <AlternativeDetails data={altData} />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

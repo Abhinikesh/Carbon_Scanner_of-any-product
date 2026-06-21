@@ -44,6 +44,14 @@ const scanSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  categoryKey: {
+    type: String,
+    default: null
+  },
+  calculationDetails: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
+  },
   score: {
     type: Number,
     default: null

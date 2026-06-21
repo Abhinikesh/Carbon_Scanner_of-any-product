@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
   Leaf, Search, Bell, BarChart2, CloudUpload, LayoutGrid,
-  Settings, QrCode, X, ChevronDown, User, LogOut, Recycle
+  Settings, QrCode, X, ChevronDown, User, LogOut, Recycle, Menu
 } from 'lucide-react';
 
 import Home         from './pages/Home.jsx';
@@ -18,9 +18,10 @@ import ProtectedRoute  from './components/ProtectedRoute.jsx';
 import PublicOnlyRoute from './components/PublicOnlyRoute.jsx';
 import { useAuth }     from './context/AuthContext.jsx';
 import { ScanStatsProvider, useScanStats } from './context/ScanStatsContext.jsx';
+import QuickScanModal from './components/QuickScanModal.jsx';
 
 /* ─── NAVBAR ───────────────────────────────────────────────────────────── */
-function Navbar() {
+function Navbar({ onMenuClick }) {
   const location  = useLocation();
   const navigate  = useNavigate();
   const { user, logout } = useAuth();
@@ -62,16 +63,25 @@ function Navbar() {
 
   return (
     <nav className="fixed top-0 left-0 right-0 h-14 bg-white flex items-center justify-between px-6 z-20 border-b border-mist">
-      {/* Logo */}
-      <Link to="/app/home" className="flex items-center gap-2">
-        <div className="w-6 h-6 bg-forest rounded-md flex items-center justify-center flex-shrink-0">
-          <Leaf className="w-3.5 h-3.5 text-white" />
-        </div>
-        <span className="font-display font-bold text-[17px] text-ink tracking-tight">Climate Lens</span>
-      </Link>
+      {/* Hamburger & Logo */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onMenuClick}
+          className="md:hidden p-1.5 -ml-1 text-gray-700 hover:text-gray-900 rounded-lg hover:bg-gray-100 focus:outline-none"
+          aria-label="Open navigation menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <Link to="/app/home" className="flex items-center gap-2">
+          <div className="w-6 h-6 bg-forest rounded-md flex items-center justify-center flex-shrink-0">
+            <Leaf className="w-3.5 h-3.5 text-white" />
+          </div>
+          <span className="font-display font-bold text-[17px] text-ink tracking-tight">Climate Lens</span>
+        </Link>
+      </div>
 
       {/* Center nav */}
-      <div className="flex items-center gap-8 text-sm font-medium absolute left-1/2 -translate-x-1/2">
+      <div className="hidden md:flex items-center gap-8 text-sm font-medium absolute left-1/2 -translate-x-1/2">
         {navLinks.map(({ to, label }) => (
           <Link
             key={to}
@@ -90,7 +100,7 @@ function Navbar() {
       {/* Right side */}
       <div className="flex items-center gap-3">
         {/* Search */}
-        <div className="relative">
+        <div className="hidden sm:block relative">
           <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
@@ -159,7 +169,7 @@ function Navbar() {
 }
 
 /* ─── SIDEBAR ──────────────────────────────────────────────────────────── */
-function Sidebar() {
+function Sidebar({ isOpen, onClose, onQuickScanClick }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -179,69 +189,92 @@ function Sidebar() {
   };
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-[210px] bg-paper flex flex-col pt-4 pb-6 z-10 hidden md:flex border-r border-mist">
-      {/* Sustainability block */}
-      <div className="px-5 pt-3 pb-6 flex items-start gap-3">
-        <div className="w-9 h-9 bg-forest rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-          <Leaf className="w-5 h-5 text-white" />
+    <>
+      {/* Mobile Drawer Backdrop */}
+      {isOpen && (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 bg-black/40 z-40 md:hidden transition-opacity"
+        />
+      )}
+      <aside className={`fixed left-0 top-0 bottom-0 w-[240px] md:w-[210px] bg-paper flex flex-col pt-4 pb-6 border-r border-mist transition-transform duration-300 z-50 md:z-10 ${
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      } md:translate-x-0 md:flex`}>
+        {/* Mobile Header in Drawer */}
+        <div className="flex items-center justify-between px-5 pb-4 md:hidden border-b border-mist/50 mb-4">
+          <span className="font-display font-bold text-base text-ink">Navigation</span>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+            <X className="w-5 h-5" />
+          </button>
         </div>
-        <div>
-          <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest leading-tight font-display">
-            Sustainability<br />Level
-          </p>
-          <p className="text-sm font-bold text-ink mt-1 font-body">
-            Monthly CO2e: <span className="font-mono tabular-nums">
-              {isLoading && stats === null ? '—' : `${stats?.thisMonthCo2Kg ?? 0} kg`}
-            </span>
-          </p>
-        </div>
-      </div>
 
-      {/* Nav items */}
-      <nav className="flex-1 px-3 space-y-0.5">
-        {navItems.map(({ to, label, Icon }) => (
-          <Link
-            key={to}
-            to={to}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors relative font-body ${
-              isActive(to)
-                ? 'bg-white text-forest font-semibold'
-                : 'text-[#1a7a4a] hover:bg-white/60'
-            }`}
+        {/* Sustainability block */}
+        <div className="px-5 pt-3 pb-6 flex items-start gap-3">
+          <div className="w-9 h-9 bg-forest rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+            <Leaf className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest leading-tight font-display">
+              Sustainability<br />Level
+            </p>
+            <p className="text-sm font-bold text-ink mt-1 font-body">
+              Monthly CO2e: <span className="font-mono tabular-nums">
+                {isLoading && stats === null ? '—' : `${stats?.thisMonthCo2Kg ?? 0} kg`}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        {/* Nav items */}
+        <nav className="flex-1 px-3 space-y-0.5">
+          {navItems.map(({ to, label, Icon }) => (
+            <Link
+              key={to}
+              to={to}
+              onClick={onClose}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors relative font-body ${
+                isActive(to)
+                  ? 'bg-white text-forest font-semibold'
+                  : 'text-[#1a7a4a] hover:bg-white/60'
+              }`}
+            >
+              <Icon className="w-[18px] h-[18px]" />
+              {label}
+              {isActive(to) && (
+                <span className="absolute right-0 top-2 bottom-2 w-1 bg-forest rounded-l-full" />
+              )}
+            </Link>
+          ))}
+        </nav>
+
+        {/* User profile footer */}
+        <div className="px-5 border-t border-mist/50 pt-4 mt-auto">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full overflow-hidden border border-mist bg-white">
+              <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.name || 'Felix')}`} alt="User" className="w-full h-full object-cover" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-ink truncate font-display">{user?.name}</p>
+              <p className="text-[9px] text-gray-400 truncate font-body">User Profile</p>
+            </div>
+          </div>
+        </div>
+
+         {/* Quick Scan */}
+        <div className="px-3 mt-4">
+          <button
+            onClick={() => {
+              onClose?.();
+              onQuickScanClick?.();
+            }}
+            className="w-full bg-forest hover:bg-forest-dark text-white rounded-xl py-3 flex items-center justify-center gap-2.5 font-bold text-sm transition-colors font-body"
           >
-            <Icon className="w-[18px] h-[18px]" />
-            {label}
-            {isActive(to) && (
-              <span className="absolute right-0 top-2 bottom-2 w-1 bg-forest rounded-l-full" />
-            )}
-          </Link>
-        ))}
-      </nav>
-
-      {/* User profile footer */}
-      <div className="px-5 border-t border-mist/50 pt-4 mt-auto">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full overflow-hidden border border-mist bg-white">
-            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.name || 'Felix')}`} alt="User" className="w-full h-full object-cover" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-bold text-ink truncate font-display">{user?.name}</p>
-            <p className="text-[9px] text-gray-400 truncate font-body">User Profile</p>
-          </div>
+            <QrCode className="w-5 h-5" />
+            Quick Scan
+          </button>
         </div>
-      </div>
-
-      {/* Quick Scan */}
-      <div className="px-3 mt-4">
-        <button
-          onClick={() => navigate('/app/upload-center')}
-          className="w-full bg-forest hover:bg-forest-dark text-white rounded-xl py-3 flex items-center justify-center gap-2.5 font-bold text-sm transition-colors font-body"
-        >
-          <QrCode className="w-5 h-5" />
-          Quick Scan
-        </button>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }
 
@@ -270,11 +303,24 @@ function AppLayout({ children }) {
 
 function AppLayoutContent({ children }) {
   const { user } = useAuth();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isQuickScanOpen, setIsQuickScanOpen] = useState(false);
+  const location = useLocation();
+
+  // Close mobile drawer on route change
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [location.pathname]);
+
   return (
     <div className="font-body antialiased text-ink">
-      <Navbar />
-      <Sidebar />
-      <main className="md:ml-[210px] mt-[56px] min-h-screen bg-paper">
+      <Navbar onMenuClick={() => setDrawerOpen(true)} />
+      <Sidebar 
+        isOpen={drawerOpen} 
+        onClose={() => setDrawerOpen(false)} 
+        onQuickScanClick={() => setIsQuickScanOpen(true)}
+      />
+      <main className="md:ml-[210px] mt-[56px] min-h-screen bg-paper pb-16 md:pb-0">
         {children}
       </main>
       {/* Mobile bottom nav */}
@@ -291,6 +337,9 @@ function AppLayoutContent({ children }) {
           </Link>
         ))}
       </div>
+      
+      {/* Quick Scan Modal */}
+      <QuickScanModal isOpen={isQuickScanOpen} onClose={() => setIsQuickScanOpen(false)} />
     </div>
   );
 }

@@ -3,29 +3,29 @@
   "_disclaimer": "Directional estimates for personal footprint awareness only.",
 
   "spendCategories": {
-    "groceries":     { "factorPerDollar": 0.30, "label": "Groceries" },
-    "restaurant":     { "factorPerDollar": 0.40, "label": "Restaurant & Dining" },
-    "clothing":       { "factorPerDollar": 0.25, "label": "Clothing & Fashion" },
-    "electronics":    { "factorPerDollar": 0.35, "label": "Electronics Retail" },
-    "fuel":           { "factorPerDollar": 2.30, "label": "Fuel & Gas" },
-    "pharmacy":       { "factorPerDollar": 0.20, "label": "Pharmacy & Health" },
-    "homeGoods":      { "factorPerDollar": 0.30, "label": "Home Goods & Furniture" },
-    "general":        { "factorPerDollar": 0.25, "label": "General Retail" }
+    "groceries":     { "factorPerDollar": 0.30, "label": "Groceries", "alternativeTip": "Shifting even a few meals a week toward plant-based proteins is the single biggest lever on a grocery bill's footprint." },
+    "restaurant":    { "factorPerDollar": 0.40, "label": "Restaurant & Dining", "alternativeTip": "Dining at local farm-to-table restaurants or reducing food waste saves transport and landfill methane emissions." },
+    "clothing":      { "factorPerDollar": 0.25, "label": "Clothing & Fashion", "alternativeTip": "Buying second-hand garments or renting special occasion wear halts clothing production footprint entirely." },
+    "electronics":   { "factorPerDollar": 0.35, "label": "Electronics Retail", "alternativeTip": "Buy refurbished devices or repair existing hardware to avoid heavy semiconductor manufacturing emissions." },
+    "fuel":          { "factorPerDollar": 2.30, "label": "Fuel & Gas", "alternativeTip": "Consolidating trips, choosing public transit, or carpooling can slice fuel consumption and direct emissions in half." },
+    "pharmacy":      { "factorPerDollar": 0.20, "label": "Pharmacy & Health", "alternativeTip": "Opting for generic medicines in bulk packaging and eco-friendly personal care items reduces container waste." },
+    "homeGoods":     { "factorPerDollar": 0.30, "label": "Home Goods & Furniture", "alternativeTip": "Choosing pre-owned wooden furniture or certified eco-textiles cuts manufacturing footprint by up to 70%." },
+    "general":       { "factorPerDollar": 0.25, "label": "General Retail", "alternativeTip": "Review purchases to prioritize high-durability items and reduce non-essential packaging waste." }
   },
 
   "materialCategories": {
-    "leather":            { "co2PerItem": 15,  "label": "Leather Goods" },
-    "cotton":             { "co2PerItem": 7,   "label": "Cotton Textile" },
-    "syntheticTextile":   { "co2PerItem": 5.5, "label": "Synthetic Textile" },
-    "plastic":            { "co2PerItem": 3,   "label": "Plastic Item" },
-    "bambooWood":         { "co2PerItem": 1.5, "label": "Bamboo / Wood" },
-    "glass":              { "co2PerItem": 2,   "label": "Glass Item" },
-    "metal":              { "co2PerItem": 6,   "label": "Metal Item" },
-    "paper":              { "co2PerItem": 1,   "label": "Paper / Cardboard" },
-    "electronicsSmall":   { "co2PerItem": 8,   "label": "Small Electronics (cable, charger)" },
-    "electronicsPhone":   { "co2PerItem": 70,  "label": "Smartphone" },
-    "electronicsLaptop":  { "co2PerItem": 300, "label": "Laptop / Computer" },
-    "general":            { "co2PerItem": 5,   "label": "General / Unidentified" }
+    "leather":            { "co2PerItem": 15.0,  "label": "Leather Goods", "alternative": { "label": "Recycled fabric or vegan leather", "co2PerItem": 5.0, "message": "Recycled fabric and vegan leather alternatives avoid the methane-heavy livestock supply chain entirely." } },
+    "cotton":             { "co2PerItem": 7.0,   "label": "Cotton Textile", "alternative": { "label": "Organic or recycled cotton", "co2PerItem": 3.5, "message": "Organic and recycled cotton use less water and avoid chemical-intensive synthetic pesticide application." } },
+    "syntheticTextile":   { "co2PerItem": 5.5, "label": "Synthetic Textile", "alternative": { "label": "Recycled polyester (rPET) or linen", "co2PerItem": 2.5, "message": "Recycled polyester or natural linen drastically reduces fossil fuel extraction and microplastic shedding." } },
+    "plastic":            { "co2PerItem": 3.0,   "label": "Plastic Item", "alternative": { "label": "Reusable metal or glass containers", "co2PerItem": 0.5, "message": "Replacing single-use plastic with reusable steel or glass lowers lifetime plastic production emissions by over 80%." } },
+    "bambooWood":         { "co2PerItem": 1.5, "label": "Bamboo / Wood", "alternative": { "label": "Sustainably certified (FSC) wood", "co2PerItem": 0.8, "message": "FSC-certified timber guarantees responsible forest management that protects active carbon sinks." } },
+    "glass":              { "co2PerItem": 2.0,   "label": "Glass Item", "alternative": { "label": "Recycled glass or metal container", "co2PerItem": 1.2, "message": "Recycled glass melts at lower temperatures, saving process energy and carbon emissions." } },
+    "metal":              { "co2PerItem": 6.0,   "label": "Metal Item", "alternative": { "label": "Recycled aluminum or steel", "co2PerItem": 2.0, "message": "Recycling metal consumes up to 95% less energy than refining virgin ores from mine to market." } },
+    "paper":              { "co2PerItem": 1.0,   "label": "Paper / Cardboard", "alternative": { "label": "Unbleached recycled paper", "co2PerItem": 0.4, "message": "Unbleached post-consumer paper preserves forests and bypasses carbon-heavy chlorine chemical treatments." } },
+    "electronicsSmall":   { "co2PerItem": 8.0,   "label": "Small Electronics (cable, charger)", "alternative": { "label": "Refurbished cable/charger or repair", "co2PerItem": 2.0, "message": "Using refurbished accessories prevents e-waste and halts resource extraction for new circuitry." } },
+    "electronicsPhone":   { "co2PerItem": 70.0,  "label": "Smartphone", "alternative": { "label": "Refurbished smartphone or battery swap", "co2PerItem": 15.0, "message": "Buying refurbished or repairing your current phone avoids the carbon-intensive manufacturing of a new mainboard." } },
+    "electronicsLaptop":  { "co2PerItem": 300.0, "label": "Laptop / Computer", "alternative": null },
+    "general":            { "co2PerItem": 5.0,   "label": "General / Unidentified", "alternative": null }
   },
 
   "foodPerKg": {
@@ -34,11 +34,20 @@
     "vegetables": 0.4, "fruit": 0.5, "legumes": 1, "grains": 1.1
   },
 
+  "foodSwaps": {
+    "beef": "legumes",
+    "lamb": "poultry",
+    "cheese": "tofu",
+    "milk": "tofu"
+  },
+
   "flightFactors": {
     "domesticPerKm": 0.246,
     "shortHaulPerKm": 0.151,
     "longHaulPerKm": 0.148,
-    "shortHaulThresholdKm": 1500
+    "shortHaulThresholdKm": 1500,
+    "railFactorPerKgKm": 0.035,
+    "railNote": "Rail passenger factor is a broad national average, not specific to route or operator speed"
   },
 
   "scoreNormalization": {
