@@ -273,7 +273,10 @@ export default function Dashboard() {
       <div className="bg-white border border-mist rounded-xl p-6 shadow-sm">
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-display font-bold text-ink">Recent Scans</h2>
-          <button onClick={() => navigate('/app/upload-center')} className="text-xs text-[#1a7a4a] font-semibold hover:text-forest transition-colors font-body focus:outline-none focus:ring-2 focus:ring-forest/20 rounded">+ New Scan</button>
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate('/app/history')} className="text-xs text-[#1a7a4a] font-semibold hover:text-forest transition-colors font-body focus:outline-none focus:ring-2 focus:ring-forest/20 rounded">View All →</button>
+            <button onClick={() => navigate('/app/upload-center')} className="text-xs text-[#1a7a4a] font-semibold hover:text-forest transition-colors font-body focus:outline-none focus:ring-2 focus:ring-forest/20 rounded">+ New Scan</button>
+          </div>
         </div>
 
         {scansLoading ? (

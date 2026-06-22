@@ -44,7 +44,7 @@ async function createScan(req, res, next) {
         scan.co2Kg = carbonResult.co2Kg;
         scan.score = carbonResult.score;
         scan.parsedFields = carbonResult.note ? { note: carbonResult.note } : {};
-        
+
         const details = {};
         const extraKeys = ['distanceKm', 'estimatedAmount', 'note', 'calculationMethod'];
         for (const k of extraKeys) {
@@ -71,13 +71,13 @@ async function createScan(req, res, next) {
         const User = require('../models/User');
         const { updateStreak } = require('../utils/streakEngine');
         const { checkAndAwardBadges } = require('../utils/badgeEngine');
-        
+
         const user = await User.findById(req.user.id);
         if (user) {
           updateStreak(user);
           const newBadges = await checkAndAwardBadges(user);
           await user.save({ validateBeforeSave: false });
-          
+
           return res.status(201).json({
             success: true,
             scan,
@@ -130,7 +130,7 @@ async function createScan(req, res, next) {
         scan.categoryKey = carbonResult.categoryKey;
         scan.co2Kg = carbonResult.co2Kg;
         scan.score = carbonResult.score;
-        
+
         // Save travel distance info or other attributes returned from engine if present
         scan.parsedFields = {
           ...parsed,
@@ -167,13 +167,13 @@ async function createScan(req, res, next) {
         const User = require('../models/User');
         const { updateStreak } = require('../utils/streakEngine');
         const { checkAndAwardBadges } = require('../utils/badgeEngine');
-        
+
         const user = await User.findById(req.user.id);
         if (user) {
           updateStreak(user);
           const newBadges = await checkAndAwardBadges(user);
           await user.save({ validateBeforeSave: false });
-          
+
           return res.status(201).json({
             success: true,
             scan,
@@ -531,6 +531,24 @@ async function getScanAlternative(req, res, next) {
   }
 }
 
+/**
+ * Deletes a scan by ID for the authenticated user.
+ *
+ * @route DELETE /api/scans/:id
+ * @access Private
+ */
+async function deleteScan(req, res, next) {
+  try {
+    const scan = await Scan.findOneAndDelete({ _id: req.params.id, user: req.user.id });
+    if (!scan) {
+      return res.status(404).json({ success: false, message: 'Scan not found' });
+    }
+    return res.status(200).json({ success: true, message: 'Scan deleted' });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   createScan,
   listScans,
@@ -538,6 +556,7 @@ module.exports = {
   updateScanCategory,
   getScanStats,
   getScanChart,
-  getScanAlternative
+  getScanAlternative,
+  deleteScan
 };
 

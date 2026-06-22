@@ -30,5 +30,8 @@ router.post('/', scanCreateLimiter, uploadSingle, scanController.createScan);
 // PATCH /api/scans/:id/category - Update scan category and recalculate CO2
 router.patch('/:id/category', validateObjectId('id'), scanController.updateScanCategory);
 
+// DELETE /api/scans/:id - Delete a scan
+router.delete('/:id', validateObjectId('id'), scanController.deleteScan);
+
 module.exports = router;
 

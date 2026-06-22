@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
   Leaf, Search, Bell, BarChart2, CloudUpload, LayoutGrid,
-  Settings, QrCode, X, ChevronDown, User, LogOut, Recycle, Menu
+  Settings, QrCode, X, ChevronDown, User, LogOut, Recycle, Menu,
+  Trophy, History
 } from 'lucide-react';
 
 import Home         from './pages/Home.jsx';
@@ -13,6 +14,8 @@ import SettingsPage from './pages/Settings.jsx';
 import Login        from './pages/Login.jsx';
 import Signup       from './pages/Signup.jsx';
 import LandingPage  from './pages/LandingPage.jsx';
+import Leaderboard  from './pages/Leaderboard.jsx';
+import ScanHistory  from './pages/ScanHistory.jsx';
 
 import ProtectedRoute  from './components/ProtectedRoute.jsx';
 import PublicOnlyRoute from './components/PublicOnlyRoute.jsx';
@@ -176,11 +179,13 @@ function Sidebar({ isOpen, onClose, onQuickScanClick }) {
   const { stats, isLoading } = useScanStats();
 
   const navItems = [
-    { to: '/app/home',          label: 'Home',         Icon: BarChart2      },
-    { to: '/app/upload-center', label: 'Upload Center', Icon: CloudUpload   },
-    { to: '/app/recycle',       label: 'Recycle Finder',Icon: Recycle       },
-    { to: '/app/dashboard',     label: 'Dashboard',    Icon: LayoutGrid     },
-    { to: '/app/settings',      label: 'Settings',     Icon: Settings       },
+    { to: '/app/home',          label: 'Home',           Icon: BarChart2    },
+    { to: '/app/upload-center', label: 'Upload Center',  Icon: CloudUpload  },
+    { to: '/app/recycle',       label: 'Recycle Finder', Icon: Recycle      },
+    { to: '/app/dashboard',     label: 'Dashboard',      Icon: LayoutGrid   },
+    { to: '/app/history',       label: 'Scan History',   Icon: History      },
+    { to: '/app/leaderboard',   label: 'Leaderboard',    Icon: Trophy       },
+    { to: '/app/settings',      label: 'Settings',       Icon: Settings     },
   ];
 
   const isActive = (to) => {
@@ -326,11 +331,11 @@ function AppLayoutContent({ children }) {
       {/* Mobile bottom nav */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-mist flex justify-around py-2 md:hidden z-30">
         {[
-          { to: '/app/home',          Icon: BarChart2,      label: 'Home'     },
-          { to: '/app/upload-center', Icon: CloudUpload,    label: 'Upload'   },
-          { to: '/app/recycle',       Icon: Recycle,        label: 'Recycle'  },
-          { to: '/app/dashboard',     Icon: LayoutGrid,     label: 'Dashboard'},
-          { to: '/app/settings',      Icon: Settings,       label: 'Settings' },
+          { to: '/app/home',          Icon: BarChart2,   label: 'Home'     },
+          { to: '/app/upload-center', Icon: CloudUpload, label: 'Upload'   },
+          { to: '/app/recycle',       Icon: Recycle,     label: 'Recycle'  },
+          { to: '/app/history',       Icon: History,     label: 'History'  },
+          { to: '/app/leaderboard',   Icon: Trophy,      label: 'Leaders'  },
         ].map(({ to, Icon, label }) => (
           <Link key={to} to={to} className="flex flex-col items-center gap-1 text-[10px] text-gray-400 font-body">
             <Icon className="w-5 h-5" /> {label}
@@ -363,6 +368,8 @@ export default function App() {
         <Route path="/app/upload-center" element={<AppLayout><UploadCenter /></AppLayout>} />
         <Route path="/app/recycle" element={<AppLayout><RecycleFinder /></AppLayout>} />
         <Route path="/app/dashboard" element={<AppLayout><Dashboard /></AppLayout>} />
+        <Route path="/app/history" element={<AppLayout><ScanHistory /></AppLayout>} />
+        <Route path="/app/leaderboard" element={<AppLayout><Leaderboard /></AppLayout>} />
         <Route path="/app/settings" element={<AppLayout><SettingsPage /></AppLayout>} />
       </Route>
 
