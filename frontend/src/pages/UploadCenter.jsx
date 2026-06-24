@@ -10,6 +10,7 @@ import api from '../lib/api.js'; // Use the authenticated Axios client from Part
 import { useScanStats } from '../context/ScanStatsContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { decodeBarcodeFromFile } from '../lib/barcodeScanner';
+import { warmUpClassifier } from '../lib/imageClassifier';
 import { submitScan } from '../lib/scanSubmission';
 import ScoreBadge from '../components/common/ScoreBadge.jsx';
 
@@ -144,9 +145,12 @@ export default function UploadCenter() {
     }
   }, []);
 
-  // Fetch scans on load
+  // Fetch scans on load, and warm up the AI classifier for product-type scans
   useEffect(() => {
     fetchRecentScans();
+    // Fire-and-forget: starts downloading the ONNX model in the background
+    // so it is likely ready by the time the user selects a product image.
+    warmUpClassifier();
   }, [fetchRecentScans]);
 
   // Handle barcode decoding for barcode uploads

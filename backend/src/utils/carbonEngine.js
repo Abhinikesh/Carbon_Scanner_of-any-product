@@ -226,9 +226,10 @@ async function calculateBarcodeCarbon(barcodeValue) {
  * @param {string} scanType - 'receipt' | 'product' | 'flight' | 'barcode'
  * @param {object} parsedFields - Parsed text fields
  * @param {string} barcodeValue - Barcode digit string
+ * @param {string[]} aiLabels - AI-predicted image labels (from client-side classifier)
  * @returns {Promise<object>} - Carbon result payload
  */
-async function calculateCarbon(scanType, parsedFields = {}, barcodeValue = null) {
+async function calculateCarbon(scanType, parsedFields = {}, barcodeValue = null, aiLabels = []) {
   if (scanType === 'receipt') {
     const storeName = parsedFields.storeName || '';
     const itemLines = parsedFields.itemLines || [];
@@ -251,8 +252,23 @@ async function calculateCarbon(scanType, parsedFields = {}, barcodeValue = null)
   }
 
   if (scanType === 'product') {
-    const searchText = parsedFields.productNameGuess || '';
+    // Combine OCR-derived text and AI-predicted labels into one search string.
+    // matchMaterialCategory returns null when nothing matches — this is correct
+    // and must produce an honest "Unidentified" result, not a guess.
+    const searchText = (parsedFields.productNameGuess || '') + ' ' + aiLabels.join(' ');
     const materialKey = matchMaterialCategory(searchText);
+
+    if (materialKey === null) {
+      return {
+        category: 'Unidentified',
+        categoryKey: null,
+        co2Kg: null,
+        score: null,
+        calculationMethod: 'unidentified',
+        note: 'No readable product text or recognizable object was found. You can set a category manually.'
+      };
+    }
+
     return calculateProductCarbon(materialKey);
   }
 

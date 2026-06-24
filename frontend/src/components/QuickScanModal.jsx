@@ -7,6 +7,7 @@ import {
 import { useScanStats } from '../context/ScanStatsContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { submitScan } from '../lib/scanSubmission';
+import { warmUpClassifier } from '../lib/imageClassifier';
 import ScoreBadge from './common/ScoreBadge.jsx';
 import Spinner from './common/Spinner.jsx';
 import ErrorBanner from './common/ErrorBanner.jsx';
@@ -137,6 +138,11 @@ export default function QuickScanModal({ isOpen, onClose }) {
   const selectType = (typeId) => {
     setSelectedType(typeId);
     setStep('select-file');
+    // For product type: start loading the AI classifier in the background
+    // the moment the user picks this type, before they even select a file.
+    if (typeId === 'product') {
+      warmUpClassifier();
+    }
   };
 
   const handleBack = () => {

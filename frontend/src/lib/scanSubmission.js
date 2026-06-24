@@ -1,6 +1,7 @@
 import api from './api';
 import { convertPdfFirstPageToFile } from './pdfToImage';
 import { decodeBarcodeFromFile } from './barcodeScanner';
+import { classifyImage } from './imageClassifier';
 
 /**
  * Handles the preparation and backend submission of a scan (Product, Receipt, Flight, or Barcode).
@@ -45,6 +46,30 @@ export async function submitScan({ type, file, barcodeValueOverride }) {
       const formData = new FormData();
       formData.append('file', fileToUpload);
       formData.append('type', type);
+
+      // For product scans only: run client-side AI image classification.
+      // The resulting labels feed into the backend keyword matcher as extra
+      // search text — they never bypass or replace the honest-null OCR logic.
+      if (type === 'product') {
+        try {
+          const rawResults = await classifyImage(fileToUpload);
+
+          // Keep only confident predictions (score >= 0.15), take top 3 labels
+          const filteredLabels = rawResults
+            .filter((r) => r.score >= 0.15)
+            .slice(0, 3)
+            .map((r) => r.label);
+
+          if (filteredLabels.length > 0) {
+            console.log('[scanSubmission] Sending aiLabels:', filteredLabels);
+            formData.append('aiLabels', JSON.stringify(filteredLabels));
+          }
+          // If empty (model failure or low confidence), simply don't append the field.
+        } catch (classifyErr) {
+          // Classification failure must never block the scan — continue without labels
+          console.warn('[scanSubmission] classifyImage error (ignored):', classifyErr?.message);
+        }
+      }
 
       response = await api.post('/scans', formData);
     }

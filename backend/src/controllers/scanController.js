@@ -123,43 +123,82 @@ async function createScan(req, res, next) {
       // Parse fields from OCR text
       const parsed = parseFields(type, ocrResult.text);
 
-      // Run Carbon Engine calculations
+      // Safely parse the aiLabels field sent by the client-side image classifier.
+      // It arrives as a JSON string (or may be absent). Never let a bad value crash the request.
+      let aiLabels = [];
       try {
-        const carbonResult = await calculateCarbon(type, parsed, null);
-        scan.category = carbonResult.category;
-        scan.categoryKey = carbonResult.categoryKey;
-        scan.co2Kg = carbonResult.co2Kg;
-        scan.score = carbonResult.score;
-
-        // Save travel distance info or other attributes returned from engine if present
-        scan.parsedFields = {
-          ...parsed,
-          ...(carbonResult.distanceKm != null ? { distanceKm: carbonResult.distanceKm } : {}),
-          ...(carbonResult.note ? { note: carbonResult.note } : {})
-        };
-
-        const details = {};
-        const extraKeys = ['distanceKm', 'estimatedAmount', 'note', 'calculationMethod'];
-        for (const k of extraKeys) {
-          if (carbonResult[k] !== undefined) {
-            details[k] = carbonResult[k];
+        const rawAiLabels = req.body.aiLabels;
+        if (rawAiLabels) {
+          const parsed_labels = JSON.parse(rawAiLabels);
+          if (Array.isArray(parsed_labels)) {
+            aiLabels = parsed_labels;
           }
         }
-        scan.calculationDetails = details;
-        scan.status = 'ocr_done';
-      } catch (calcError) {
-        console.error('[Carbon Engine] Calculation error:', calcError.message);
-        scan.category = null;
+      } catch {
+        // malformed JSON — silently ignore, proceed with empty array
+        aiLabels = [];
+      }
+
+      // For product scans: check whether we have enough signal to attempt calculation.
+      // Proceed if OCR found meaningful text OR the AI classifier provided labels.
+      // Only bail out early if BOTH are empty.
+      const hasMeaningfulText = type === 'product'
+        ? (parsed.productNameGuess || '').trim().length > 2
+        : true; // receipt/flight always proceed to calculateCarbon
+
+      if (type === 'product' && !hasMeaningfulText && aiLabels.length === 0) {
+        // Neither OCR text nor AI labels — return honest result immediately
+        scan.category = 'Unidentified';
         scan.categoryKey = null;
         scan.co2Kg = null;
         scan.score = null;
         scan.parsedFields = {
           ...parsed,
-          note: `Carbon calculation failed: ${calcError.message}`
+          note: 'No readable product text or recognizable object was found. You can set a category manually.'
         };
-        scan.calculationDetails = {};
-        scan.status = 'ocr_done'; // OCR succeeded, so set scan to done
-      }
+        scan.calculationDetails = { calculationMethod: 'unidentified', aiLabels: [] };
+        scan.status = 'ocr_done';
+      } else {
+        // Run Carbon Engine calculations
+        try {
+          const carbonResult = await calculateCarbon(type, parsed, null, aiLabels);
+          scan.category = carbonResult.category;
+          scan.categoryKey = carbonResult.categoryKey;
+          scan.co2Kg = carbonResult.co2Kg;
+          scan.score = carbonResult.score;
+
+          // Save travel distance info or other attributes returned from engine if present
+          scan.parsedFields = {
+            ...parsed,
+            ...(carbonResult.distanceKm != null ? { distanceKm: carbonResult.distanceKm } : {}),
+            ...(carbonResult.note ? { note: carbonResult.note } : {})
+          };
+
+          const details = {};
+          const extraKeys = ['distanceKm', 'estimatedAmount', 'note', 'calculationMethod'];
+          for (const k of extraKeys) {
+            if (carbonResult[k] !== undefined) {
+              details[k] = carbonResult[k];
+            }
+          }
+          // Store aiLabels in calculationDetails for debugging/transparency
+          details.aiLabels = aiLabels;
+          scan.calculationDetails = details;
+          scan.status = 'ocr_done';
+        } catch (calcError) {
+          console.error('[Carbon Engine] Calculation error:', calcError.message);
+          scan.category = null;
+          scan.categoryKey = null;
+          scan.co2Kg = null;
+          scan.score = null;
+          scan.parsedFields = {
+            ...parsed,
+            note: `Carbon calculation failed: ${calcError.message}`
+          };
+          scan.calculationDetails = { aiLabels };
+          scan.status = 'ocr_done'; // OCR succeeded, so set scan to done
+        }
+      } // end hasMeaningfulText / aiLabels gate
 
       await scan.save();
 

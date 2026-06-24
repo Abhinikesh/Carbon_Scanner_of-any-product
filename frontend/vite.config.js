@@ -16,4 +16,13 @@ export default defineConfig({
       },
     },
   },
+  // Required for @huggingface/transformers (Transformers.js v4):
+  // onnxruntime-web ships pre-built WASM binaries — Vite must NOT try to
+  // bundle/rewrite them, otherwise the WASM loading paths break at runtime.
+  optimizeDeps: {
+    exclude: ['onnxruntime-web'],
+  },
+  worker: {
+    format: 'es',
+  },
 })

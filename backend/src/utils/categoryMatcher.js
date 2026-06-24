@@ -31,26 +31,104 @@ function matchSpendCategory(text = '') {
 
 /**
  * Matches a product description text to a material category based on keywords.
- * Defaults to 'general'.
+ * Returns null if no keyword matches — callers must handle null explicitly
+ * and must NOT default-guess a category.
  *
- * @param {string} text - The input text to search
- * @returns {string} - The matched material category key
+ * @param {string} text - The input text to search (may include AI-predicted labels)
+ * @returns {string|null} - The matched material category key, or null if unidentified
  */
 function matchMaterialCategory(text = '') {
   const normalized = text.toLowerCase();
 
   const rules = [
-    { key: 'leather', keywords: ['leather', 'hide'] },
-    { key: 'cotton', keywords: ['cotton'] },
-    { key: 'syntheticTextile', keywords: ['polyester', 'nylon', 'synthetic', 'acrylic'] },
-    { key: 'plastic', keywords: ['plastic'] },
-    { key: 'bambooWood', keywords: ['bamboo', 'wood', 'timber', 'wooden'] },
-    { key: 'glass', keywords: ['glass'] },
-    { key: 'metal', keywords: ['metal', 'steel', 'aluminum', 'aluminium'] },
-    { key: 'paper', keywords: ['paper', 'cardboard'] },
-    { key: 'electronicsLaptop', keywords: ['laptop', 'macbook', 'notebook computer'] },
-    { key: 'electronicsPhone', keywords: ['phone', 'iphone', 'smartphone', 'galaxy'] },
-    { key: 'electronicsSmall', keywords: ['charger', 'cable', 'adapter', 'earbuds', 'headphone'] }
+    {
+      key: 'leather',
+      keywords: [
+        'leather', 'hide',
+        // Object-name keywords for AI label matching (Step 6)
+        'wallet', 'purse', 'handbag', 'loafer'
+      ]
+    },
+    {
+      key: 'cotton',
+      keywords: [
+        'cotton',
+        // Object-name keywords
+        't-shirt', 'tshirt', 'jeans', 'denim', 'hoodie'
+      ]
+    },
+    {
+      key: 'syntheticTextile',
+      keywords: [
+        'polyester', 'nylon', 'synthetic', 'acrylic',
+        // Object-name keywords for AI label matching
+        'backpack', 'running shoe', 'sneaker', 'jersey', 'sweatshirt'
+      ]
+    },
+    {
+      key: 'plastic',
+      keywords: [
+        'plastic',
+        // Object-name keywords for AI label matching
+        'water bottle', 'pop bottle', 'plastic bag'
+      ]
+    },
+    {
+      key: 'bambooWood',
+      keywords: [
+        'bamboo', 'wood', 'timber', 'wooden',
+        // Object-name keywords for AI label matching
+        'cutting board', 'wooden spoon'
+      ]
+    },
+    {
+      key: 'glass',
+      keywords: [
+        'glass',
+        // Object-name keywords for AI label matching
+        'wine bottle', 'beer bottle', 'drinking glass'
+      ]
+    },
+    {
+      key: 'metal',
+      keywords: [
+        'metal', 'steel', 'aluminum', 'aluminium',
+        // Object-name keywords
+        'can', 'tin', 'kettle'
+      ]
+    },
+    {
+      key: 'paper',
+      keywords: [
+        'paper', 'cardboard',
+        // Object-name keywords for AI label matching
+        'envelope', 'paper towel', 'magazine', 'newspaper'
+      ]
+    },
+    {
+      key: 'electronicsLaptop',
+      keywords: [
+        'laptop', 'macbook',
+        // Object-name keywords for AI label matching
+        'notebook computer'
+      ]
+    },
+    {
+      key: 'electronicsPhone',
+      keywords: [
+        'phone', 'iphone', 'smartphone', 'galaxy',
+        // Object-name keywords for AI label matching
+        'cellular telephone', 'smart phone'
+      ]
+    },
+    {
+      key: 'electronicsSmall',
+      keywords: [
+        'charger', 'cable', 'adapter', 'earbuds', 'headphone',
+        // Object-name keywords
+        'mouse', 'keyboard'
+      ]
+    }
   ];
 
   for (const rule of rules) {
@@ -61,7 +139,8 @@ function matchMaterialCategory(text = '') {
     }
   }
 
-  return 'general';
+  // Return null — do NOT guess. Callers must return an honest "Unidentified" result.
+  return null;
 }
 
 module.exports = {
