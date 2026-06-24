@@ -1,4 +1,4 @@
-# 🌍 CO2 Emission — Climate Lens
+# CO2 Emission — Climate Lens
 
 > AI-powered carbon footprint tracker. Scan products, receipts, food & flights to get instant CO₂ estimates, sustainability scores, and greener alternatives.
 
@@ -32,27 +32,6 @@
 
 ---
 
-## 🛠 Tech Stack
-
-### Frontend
-- React 18 + Vite
-- Tailwind CSS
-- React Router v6
-- Recharts
-- Axios
-- Lucide React
-
-### Backend
-- Node.js + Express.js
-- MongoDB + Mongoose
-- JWT Authentication
-- Cloudinary (image storage)
-- Google Cloud Vision API
-- Climatiq API
-- Multer
-
----
-
 ## ⚙️ Environment Variables
 
 Create a `.env` file in `/backend`:
@@ -77,66 +56,8 @@ Create a `.env` in `/client`:
 ```env
 VITE_API_URL=http://localhost:5000/api
 ```
-
 ---
 
-## 📡 API Endpoints
-
-```
-POST   /api/auth/register        Register new user
-POST   /api/auth/login           Login
-POST   /api/auth/refresh-token   Refresh access token
-GET    /api/auth/me              Get current user
-
-POST   /api/scan/upload          Upload image → CO₂ result
-GET    /api/scan/history         Get scan history
-GET    /api/scan/:id             Get single scan result
-DELETE /api/scan/:id             Delete scan
-
-GET    /api/user/dashboard       Dashboard stats + chart data
-PUT    /api/user/profile         Update profile
-GET    /api/user/leaderboard     Top 10 users
-
-GET    /api/carbon/factors       All emission factors
-GET    /api/carbon/compare       Compare two items
-```
-
----
-
-## 📂 Project Structure
-
-```
-CO2-emission-Climate-Lens/
-├── backend/
-│   ├── config/          → db.js, cloudinary.js
-│   ├── controllers/     → auth, scan, user, carbon
-│   ├── middleware/      → auth, error, upload, rateLimiter
-│   ├── models/          → User, Scan, CarbonFactor
-│   ├── routes/          → all API routes
-│   ├── services/        → AI, carbon, sustainability, alternatives
-│   ├── utils/           → token, response, calculator helpers
-│   └── server.js
-├── client/
-│   ├── src/
-│   │   ├── components/  → Layout, Navbar, Sidebar
-│   │   ├── pages/       → Home, Dashboard, Upload, Result, Settings
-│   │   └── utils/       → api.js
-│   └── vite.config.js
-└── README.md
-```
-
----
-
-## 🌱 Carbon Data Sources
-
-- 🇺🇸 EPA (United States Environmental Protection Agency)
-- 🇬🇧 DEFRA (UK Department for Environment)
-- 🌾 FAO (Food and Agriculture Organization)
-- 🌐 Climatiq API (real-time global emission factors)
-
-> ⚠️ Carbon values are estimates based on public datasets. Not intended as scientific or legal advice.
-
----
 
 ## 📄 License
 
