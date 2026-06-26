@@ -2,6 +2,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { generateAccessToken, generateRefreshToken } = require('../utils/generateTokens');
+const { OAuth2Client } = require('google-auth-library');
 
 /**
  * Helper to set HttpOnly refresh token cookie
@@ -238,10 +239,100 @@ const getMe = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc   Google OAuth sign-in / sign-up
+ * @route  POST /api/auth/google
+ * @access Public
+ */
+const googleAuth = async (req, res, next) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ success: false, message: 'Google credential token is required' });
+    }
+
+    // ── 1. Verify the ID token with Google ───────────────────────────────────
+    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+    let payload;
+    try {
+      const ticket = await client.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      payload = ticket.getPayload();
+    } catch (verifyErr) {
+      return res.status(401).json({
+        success: false,
+        message: 'Google sign-in verification failed. Please try again.',
+      });
+    }
+
+    const { sub: googleId, email, name, picture } = payload;
+
+    // ── 2. Find or create the User document ──────────────────────────────────
+    let user = null;
+    let isNewUser = false;
+
+    // First try: look up by googleId (returning Google user)
+    user = await User.findOne({ googleId });
+
+    if (!user) {
+      // Second try: look up by email (existing local account with same email)
+      user = await User.findOne({ email });
+
+      if (user) {
+        // Link existing local account to Google — keep their password intact
+        user.googleId = googleId;
+        user.authProvider = 'google';
+        // Update avatar only if they don't already have a custom one
+        if (!user.avatar && picture) {
+          user.avatar = picture;
+        }
+        await user.save({ validateBeforeSave: false });
+      } else {
+        // Brand-new user: create account without a password
+        user = await User.create({
+          name,
+          email,
+          googleId,
+          authProvider: 'google',
+          avatar: picture || '',
+        });
+        isNewUser = true;
+      }
+    }
+
+    // ── 3. Issue JWT pair exactly like regular login ──────────────────────────
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
+    const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+    user.refreshTokenHash = refreshTokenHash;
+    await user.save({ validateBeforeSave: false });
+
+    setRefreshTokenCookie(res, refreshToken);
+
+    const statusCode = isNewUser ? 201 : 200;
+    return res.status(statusCode).json({
+      success: true,
+      accessToken,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar || '',
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
   refresh,
   logout,
   getMe,
+  googleAuth,
 };

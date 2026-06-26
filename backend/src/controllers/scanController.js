@@ -8,6 +8,10 @@ const {
   calculateProductCarbon
 } = require('../utils/carbonEngine');
 const emissionFactors = require('../data/emissionFactors.json');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+// Gemini client — initialised once, reused for every scan request
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 /**
  * Creates a scan (OCR image upload or Barcode value) and runs carbon calculation.
@@ -123,31 +127,54 @@ async function createScan(req, res, next) {
       // Parse fields from OCR text
       const parsed = parseFields(type, ocrResult.text);
 
-      // Safely parse the aiLabels field sent by the client-side image classifier.
-      // It arrives as a JSON string (or may be absent). Never let a bad value crash the request.
+      // ── Gemini Vision identification (product scans only) ──────────────────
+      // For product scans we ask Gemini to identify the item from the raw image.
+      // The result is converted to a single-element aiLabels array so it feeds
+      // into the EXACT SAME calculateCarbon() pipeline as before — no other logic changes.
+      // On any failure (API error, quota, UNIDENTIFIED) we fall through to OCR text.
       let aiLabels = [];
-      try {
-        const rawAiLabels = req.body.aiLabels;
-        if (rawAiLabels) {
-          const parsed_labels = JSON.parse(rawAiLabels);
-          if (Array.isArray(parsed_labels)) {
-            aiLabels = parsed_labels;
+
+      if (type === 'product' && req.file && req.file.buffer) {
+        try {
+          const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+          const base64Image = req.file.buffer.toString('base64');
+
+          const geminiResult = await model.generateContent([
+            {
+              inlineData: {
+                mimeType: req.file.mimetype,
+                data: base64Image,
+              },
+            },
+            'Identify the main product or item in this image. Be specific: include material type, product category, and approximate size/quantity if visible (e.g. \'plastic water bottle 500ml\', \'cardboard shipping box medium\', \'aluminum beverage can 330ml\', \'glass wine bottle 750ml\', \'cotton t-shirt\', \'smartphone\'). If you cannot identify any product, respond with exactly: UNIDENTIFIED. Respond with ONLY the item description or UNIDENTIFIED — no other text.',
+          ]);
+
+          const identified = geminiResult.response.text().trim();
+          console.log('[Gemini Vision] Identified:', identified);
+
+          if (identified && identified !== 'UNIDENTIFIED') {
+            aiLabels = [identified];
+          } else {
+            console.log('[Gemini Vision] Could not identify item — falling back to OCR text.');
           }
+        } catch (geminiErr) {
+          // Any Gemini error (quota, network, content filter) must never hard-fail the scan
+          console.error('[Gemini Vision] Error (falling back to OCR):', geminiErr?.message || geminiErr);
+          aiLabels = [];
         }
-      } catch {
-        // malformed JSON — silently ignore, proceed with empty array
-        aiLabels = [];
       }
 
-      // For product scans: check whether we have enough signal to attempt calculation.
-      // Proceed if OCR found meaningful text OR the AI classifier provided labels.
-      // Only bail out early if BOTH are empty.
+      // For non-product types, aiLabels stays empty — calculateCarbon handles them via OCR text.
+
+      // ── Carbon gate ─────────────────────────────────────────────────────────
+      // Proceed if Gemini identified something, or OCR found meaningful text.
+      // Only bail out early if BOTH are empty (truly unidentifiable scan).
       const hasMeaningfulText = type === 'product'
         ? (parsed.productNameGuess || '').trim().length > 2
         : true; // receipt/flight always proceed to calculateCarbon
 
       if (type === 'product' && !hasMeaningfulText && aiLabels.length === 0) {
-        // Neither OCR text nor AI labels — return honest result immediately
+        // Neither Gemini nor OCR found anything — return honest result immediately
         scan.category = 'Unidentified';
         scan.categoryKey = null;
         scan.co2Kg = null;
@@ -198,7 +225,7 @@ async function createScan(req, res, next) {
           scan.calculationDetails = { aiLabels };
           scan.status = 'ocr_done'; // OCR succeeded, so set scan to done
         }
-      } // end hasMeaningfulText / aiLabels gate
+      } // end Gemini/OCR gate
 
       await scan.save();
 

@@ -22,6 +22,7 @@ import PublicOnlyRoute from './components/PublicOnlyRoute.jsx';
 import { useAuth }     from './context/AuthContext.jsx';
 import { ScanStatsProvider, useScanStats } from './context/ScanStatsContext.jsx';
 import QuickScanModal from './components/QuickScanModal.jsx';
+import Avatar from './components/common/Avatar.jsx';
 
 /* ─── NAVBAR ───────────────────────────────────────────────────────────── */
 function Navbar({ onMenuClick }) {
@@ -62,7 +63,6 @@ function Navbar({ onMenuClick }) {
     navigate('/');
   }
 
-  const avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.name || 'Felix')}`;
 
   return (
     <nav className="fixed top-0 left-0 right-0 h-14 bg-white flex items-center justify-between px-6 z-20 border-b border-mist">
@@ -139,9 +139,7 @@ function Navbar({ onMenuClick }) {
         {/* Avatar */}
         <div className="relative" ref={avatarRef}>
           <button onClick={() => setAvatarOpen(o => !o)} className="flex items-center gap-1.5 focus:outline-none">
-            <div className="w-8 h-8 rounded-full overflow-hidden border border-mist bg-paper">
-              <img src={avatarUrl} alt={user?.name || 'User'} className="w-full h-full object-cover" />
-            </div>
+            <Avatar src={user?.avatar} name={user?.name} size={32} className="border border-mist" />
             <span className="hidden sm:inline text-xs font-semibold text-ink font-body max-w-[80px] truncate">
               {user?.name}
             </span>
@@ -202,7 +200,7 @@ function Sidebar({ isOpen, onClose, onQuickScanClick }) {
           className="fixed inset-0 bg-black/40 z-40 md:hidden transition-opacity"
         />
       )}
-      <aside className={`fixed left-0 top-0 bottom-0 w-[240px] md:w-[210px] bg-paper flex flex-col pt-4 pb-6 border-r border-mist transition-transform duration-300 z-50 md:z-10 ${
+      <aside className={`fixed left-0 top-0 md:top-14 bottom-0 w-[240px] md:w-[210px] bg-paper flex flex-col pt-4 pb-6 border-r border-mist transition-transform duration-300 z-50 md:z-10 ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
       } md:translate-x-0 md:flex`}>
         {/* Mobile Header in Drawer */}
@@ -255,9 +253,7 @@ function Sidebar({ isOpen, onClose, onQuickScanClick }) {
         {/* User profile footer */}
         <div className="px-5 border-t border-mist/50 pt-4 mt-auto">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full overflow-hidden border border-mist bg-white">
-              <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.name || 'Felix')}`} alt="User" className="w-full h-full object-cover" />
-            </div>
+            <Avatar src={user?.avatar} name={user?.name} size={32} className="border border-mist" />
             <div className="min-w-0">
               <p className="text-xs font-bold text-ink truncate font-display">{user?.name}</p>
               <p className="text-[9px] text-gray-400 truncate font-body">User Profile</p>

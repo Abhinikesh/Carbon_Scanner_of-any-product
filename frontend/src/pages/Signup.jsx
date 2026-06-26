@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Leaf, Eye, EyeOff } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
 import ErrorBanner from '../components/common/ErrorBanner.jsx';
 
 export default function Signup() {
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
@@ -64,6 +65,21 @@ export default function Signup() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // ── Google sign-in handlers ───────────────────────────────────────────────
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setErrorMsg('');
+    try {
+      await loginWithGoogle(credentialResponse.credential);
+      navigate('/app/home');
+    } catch (err) {
+      setErrorMsg(err.message || 'Google sign-in failed. Please try again.');
+    }
+  };
+
+  const handleGoogleError = () => {
+    setErrorMsg('Google sign-in failed. Please try again.');
   };
 
   return (
@@ -192,6 +208,26 @@ export default function Signup() {
             {isSubmitting ? 'Creating account…' : 'Create Account'}
           </button>
         </form>
+
+        {/* OR divider */}
+        <div className="flex items-center gap-3 my-6">
+          <div className="flex-1 h-px bg-mist" />
+          <span className="text-xs text-gray-400 font-body font-semibold uppercase tracking-wider">or</span>
+          <div className="flex-1 h-px bg-mist" />
+        </div>
+
+        {/* Google sign-in button — same endpoint handles both new and returning Google users */}
+        <div className="flex justify-center">
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={handleGoogleError}
+            theme="outline"
+            size="large"
+            width="376"
+            text="signup_with"
+            shape="rectangular"
+          />
+        </div>
 
         {/* Footer Link */}
         <div className="mt-8 pt-6 border-t border-mist/50 text-center">

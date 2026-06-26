@@ -24,7 +24,8 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, 'Password is required'],
+      // Only required for local accounts — Google accounts have no password
+      required: function () { return !this.googleId; },
       select: false,
     },
     avatar: {
@@ -39,8 +40,19 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
-    // Preserved fields for application statistics and dashboards
-    googleId: { type: String },
+    // OAuth / auth provider fields
+    googleId: {
+      type: String,
+      default: null,
+      unique: true,
+      sparse: true,   // sparse index: only indexes docs where googleId is non-null
+    },
+    authProvider: {
+      type: String,
+      enum: ['local', 'google'],
+      default: 'local',
+    },
+    // Application statistics and dashboards
     totalScans: { type: Number, default: 0 },
     totalCO2: { type: Number, default: 0 },
     carbonHistory: [carbonHistorySchema],
@@ -57,15 +69,16 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Hash password before saving with 10 salt rounds
+// Hash password before saving — only when a password is present AND was modified.
+// Google-only accounts (no password field) skip this entirely.
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+  if (!this.password || !this.isModified('password')) return next();
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
   next();
 });
 
-// Compare password
+// Compare password (only valid on local accounts that have a password)
 userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };

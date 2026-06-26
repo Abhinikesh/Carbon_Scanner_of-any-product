@@ -74,17 +74,104 @@ const updateProfile = async (req, res, next) => {
 };
 
 /**
- * @desc   Get leaderboard (top 10 users)
- * @route  GET /api/user/leaderboard
- * @access Public
+ * @desc   Get leaderboard — top 10 by scan count (aggregated from Scan collection)
+ *         + the requesting user's own real rank even if outside top 10
+ * @route  GET /api/users/leaderboard
+ * @access Private
  */
 const getLeaderboard = async (req, res, next) => {
   try {
-    const leaders = await User.find()
-      .sort({ totalScans: -1 })
-      .limit(10)
-      .select('name avatar totalScans totalCO2 badges');
-    return sendSuccess(res, 200, 'Leaderboard fetched', { leaders });
+    const requestingUserId = req.user._id;
+
+    // ── 1. Aggregate top-10 from Scan collection ────────────────────────────
+    const aggregated = await Scan.aggregate([
+      // Group every scan document by its owner
+      {
+        $group: {
+          _id: '$user',
+          scansCount: { $sum: 1 },
+          totalCo2Kg: { $sum: { $ifNull: ['$co2Kg', 0] } },
+        },
+      },
+      // Only include users who actually have scans
+      { $match: { scansCount: { $gte: 1 } } },
+      // Sort: most scans first; CO₂ as tiebreaker
+      { $sort: { scansCount: -1, totalCo2Kg: -1 } },
+      { $limit: 10 },
+      // Join name + avatar from User collection — no sensitive fields
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'userInfo',
+        },
+      },
+      // Drop entries whose user account no longer exists
+      { $unwind: { path: '$userInfo', preserveNullAndEmptyArrays: false } },
+      {
+        $project: {
+          _id: 0,
+          userId: { $toString: '$_id' },
+          name: '$userInfo.name',
+          avatar: '$userInfo.avatar',
+          scansCount: 1,
+          totalCo2Kg: { $round: ['$totalCo2Kg', 2] },
+        },
+      },
+    ]);
+
+    // Assign 1-indexed ranks based on sorted position
+    const topPerformers = aggregated.map((entry, i) => ({
+      ...entry,
+      rank: i + 1,
+    }));
+
+    // ── 2. Compute the requesting user's own stats + rank ───────────────────
+    const myStatsAgg = await Scan.aggregate([
+      { $match: { user: requestingUserId } },
+      {
+        $group: {
+          _id: null,
+          scansCount: { $sum: 1 },
+          totalCo2Kg: { $sum: { $ifNull: ['$co2Kg', 0] } },
+        },
+      },
+    ]);
+
+    const myScansCount = myStatsAgg.length > 0 ? myStatsAgg[0].scansCount : 0;
+    const myTotalCo2Kg =
+      myStatsAgg.length > 0
+        ? parseFloat(myStatsAgg[0].totalCo2Kg.toFixed(2))
+        : 0;
+
+    // Rank = (number of users with strictly MORE scans than me) + 1
+    // If I have zero scans, rank is null — I'm not meaningfully ranked yet
+    let myRank = null;
+    if (myScansCount >= 1) {
+      const usersAhead = await Scan.aggregate([
+        {
+          $group: {
+            _id: '$user',
+            scansCount: { $sum: 1 },
+          },
+        },
+        { $match: { scansCount: { $gt: myScansCount } } },
+        { $count: 'higherUsers' },
+      ]);
+      myRank = (usersAhead.length > 0 ? usersAhead[0].higherUsers : 0) + 1;
+    }
+
+    return res.status(200).json({
+      success: true,
+      topPerformers,
+      currentUser: {
+        userId: String(requestingUserId),
+        scansCount: myScansCount,
+        totalCo2Kg: myTotalCo2Kg,
+        rank: myRank,
+      },
+    });
   } catch (error) {
     next(error);
   }

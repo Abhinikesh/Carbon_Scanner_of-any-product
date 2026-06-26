@@ -37,9 +37,9 @@ export function AuthProvider({ children }) {
   }, []);
 
   /**
-   * Log in user
-   * @param {string} email 
-   * @param {string} password 
+   * Log in user with email + password
+   * @param {string} email
+   * @param {string} password
    */
   const login = async (email, password) => {
     try {
@@ -57,10 +57,29 @@ export function AuthProvider({ children }) {
   };
 
   /**
-   * Register new user
-   * @param {string} name 
-   * @param {string} email 
-   * @param {string} password 
+   * Sign in (or sign up) with a Google ID token credential
+   * @param {string} credential  — the raw ID token from GoogleLogin's onSuccess callback
+   */
+  const loginWithGoogle = async (credential) => {
+    try {
+      const res = await api.post('/auth/google', { credential });
+      const { accessToken: token, user: userData } = res.data;
+
+      setAuthToken(token);
+      setAccessToken(token);
+      setUser(userData);
+      return { success: true };
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || 'Google sign-in failed. Please try again.';
+      throw new Error(errorMsg);
+    }
+  };
+
+  /**
+   * Register new user with email + password
+   * @param {string} name
+   * @param {string} email
+   * @param {string} password
    */
   const register = async (name, email, password) => {
     try {
@@ -112,6 +131,7 @@ export function AuthProvider({ children }) {
         isLoading,
         isAuthenticated,
         login,
+        loginWithGoogle,
         register,
         logout,
         refreshUser,
